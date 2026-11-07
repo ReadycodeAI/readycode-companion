@@ -421,30 +421,23 @@ function App() {
     });
     setWorking(false);
   }
+  const documentQuestion =
+    documents.length === 1
+      ? "Summarize this document and cite the relevant passages."
+      : "Summarize these documents and cite the relevant passages.";
+  const question = draft.trim() || (documents.length ? documentQuestion : "");
+  const hasMessage = !!question || files.length > 0;
   async function send() {
-    if (
-      !s?.paired ||
-      s.busy ||
-      working ||
-      reading ||
-      (!draft.trim() && !files.length)
-    )
-      return;
+    if (!s?.paired || s.busy || working || reading || !hasMessage) return;
     let prompt: string;
     try {
-      prompt = attachmentPrompt(draft, files);
+      prompt = attachmentPrompt(question, files);
     } catch (e) {
       setError(String((e as Error).message));
       return;
     }
     if (documents.length && draft.trim().length > 16000) {
       setError("Reader questions can contain up to 16,000 characters.");
-      return;
-    }
-    if (documents.length && !draft.trim()) {
-      setError(
-        "Enter a question so ReadyCode Reader can select relevant passages.",
-      );
       return;
     }
     const originalDocuments = documents;
@@ -461,14 +454,14 @@ function App() {
           if (
             !job ||
             job.chat !== id ||
-            job.question !== originalDraft.trim() ||
+            job.question !== question ||
             originalDocuments.length !== job.files.length ||
             originalDocuments.some((f, i) => f !== job!.files[i])
           ) {
             job = {
               id: crypto.randomUUID(),
               chat: id,
-              question: originalDraft.trim(),
+              question,
               files: originalDocuments,
             };
             readerRequest.current = job;
@@ -476,10 +469,20 @@ function App() {
           setReaderStatus(true);
           activeReader.current = job.id;
           const input = await Promise.all(
-            originalDocuments.map(async (f) => ({
-              name: f.name,
-              bytes: new Uint8Array(await f.arrayBuffer()),
-            })),
+            originalDocuments.map(async (f) => {
+              try {
+                return {
+                  name: f.name,
+                  bytes: new Uint8Array(await f.arrayBuffer()),
+                };
+              } catch {
+                throw Error(
+                  "Could not open " +
+                    f.name +
+                    " on this computer. If it is stored in OneDrive, download it first, then attach the local copy.",
+                );
+              }
+            }),
           );
           if (
             generation !== pickGeneration.current ||
@@ -1240,7 +1243,9 @@ function App() {
                   </div>
                   {documents.length > 0 && (
                     <p className="hint">
-                      Send uploads the selected documents to ReadyCode Reader.
+                      {draft.trim()
+                        ? "Send uploads your documents and question to ReadyCode Reader."
+                        : "Press Send for a cited summary, or type a question about the document."}
                       Reader checks candidate passages through the OpenRouter
                       key saved on your ReadyCode account. Only verified
                       excerpts go into the chat.
@@ -1270,9 +1275,11 @@ function App() {
                     <textarea
                       aria-label="Message"
                       placeholder={
-                        agentMode
-                          ? "Message your ReadyCode agent…"
-                          : "Message ReadyCode…"
+                        documents.length
+                          ? documentQuestion
+                          : agentMode
+                            ? "Message your ReadyCode agent…"
+                            : "Message ReadyCode…"
                       }
                       value={draft}
                       onChange={(e) => setDraft(e.target.value)}
@@ -1295,10 +1302,7 @@ function App() {
                       <button
                         className="primary"
                         disabled={
-                          !canResearch ||
-                          (!draft.trim() && !files.length) ||
-                          reading ||
-                          working
+                          !canResearch || !hasMessage || reading || working
                         }
                         onClick={() => void send()}
                       >
@@ -1308,7 +1312,7 @@ function App() {
                       <button
                         className="primary"
                         disabled={
-                          (!draft.trim() && !files.length) ||
+                          !hasMessage ||
                           reading ||
                           working ||
                           !model.trim() ||

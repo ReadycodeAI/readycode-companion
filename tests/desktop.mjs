@@ -134,7 +134,11 @@ try {
         globalThis.calls.push({
           url,
           headers: opts.headers,
-          body: { names, request_id: form.get("request_id") },
+          body: {
+            names,
+            request_id: form.get("request_id"),
+            question: form.get("question"),
+          },
         });
         return Response.json(
           { request_id: form.get("request_id"), status: "processing" },
@@ -586,6 +590,30 @@ try {
   });
   await win.getByRole("button", { name: "Refresh agents" }).click();
   await win.getByLabel("Cloud agent").selectOption("news");
+  await desktop.evaluate(() => {
+    globalThis.noEvidence = true;
+  });
+  await win.getByLabel("Attachments").setInputFiles({
+    name: "only.pdf",
+    mimeType: "application/pdf",
+    buffer: Buffer.from("original-binary-marker"),
+  });
+  await win.getByRole("button", { name: "Remove only.pdf" }).waitFor();
+  await win.getByRole("button", { name: "Send ↑" }).click();
+  await win.getByText(/Reader could not verify evidence in only.pdf/).waitFor();
+  const question = await desktop.evaluate(
+    () =>
+      globalThis.calls.find((c) => c.body?.names?.includes("only.pdf")).body
+        .question,
+  );
+  assert.equal(
+    question,
+    "Summarize this document and cite the relevant passages.",
+  );
+  await win.getByRole("button", { name: "Remove only.pdf" }).click();
+  await desktop.evaluate(() => {
+    globalThis.noEvidence = false;
+  });
   await win
     .getByLabel("Message", { exact: true })
     .fill("Research this release");
