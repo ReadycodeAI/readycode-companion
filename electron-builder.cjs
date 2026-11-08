@@ -1,0 +1,25 @@
+const official = process.env.READYCODE_OFFICIAL_RELEASE === "1";
+const repository = process.env.GITHUB_REPOSITORY || "";
+const publisher = process.env.READYCODE_SIGNING_PUBLISHER?.trim();
+if (official && (!/^[\w.-]+\/[\w.-]+$/.test(repository) || !publisher ||
+    !process.env.READYCODE_API_BASE || !process.env.READYCODE_PUBLIC_KEY))
+  throw Error("Official builds need the GitHub repository, certificate publisher and ReadyCode public configuration.");
+const [owner, repo] = repository.split("/");
+module.exports = {
+  appId: "ai.readycode.companion",
+  productName: "ReadyCode Companion",
+  electronDist: require("node:path").dirname(require("electron")),
+  directories: { output: "release/windows" },
+  files: ["dist/**/*", "package.json"],
+  forceCodeSigning: official,
+  publish: official ? [{provider: "github", owner, repo}] : null,
+  win: {
+    target: [{target: "nsis", arch: ["x64"]}],
+    icon: "assets/readycode.ico",
+    ...(official && {signtoolOptions: {publisherName: [publisher]}}),
+  },
+  nsis: {
+    oneClick: true, perMachine: false, deleteAppDataOnUninstall: false,
+    artifactName: "ReadyCode-Companion-Setup-x64.exe",
+  },
+};

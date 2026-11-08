@@ -1,4 +1,5 @@
 import { readerContext } from "./reader";
+import { startUpdates, checkUpdates, installUpdate, updateMessage, updateReady } from "./updates";
 import type { ReaderRequest } from "./types";
 import { researchAgents, sourceList, updateResearch } from "./research";
 import { parseTeam } from "./team";
@@ -85,6 +86,9 @@ function cloudFailure(e: unknown, owner: string) {
 const providerNames = Object.keys(presets) as Provider[];
 function state(): State {
   return {
+    appVersion: app.getVersion(),
+    updateMessage,
+    updateReady,
     publicKey,
     customBase,
     apiBase,
@@ -399,6 +403,12 @@ function bind(name: string, fn: (...args: any[]) => unknown) {
 }
 function handlers() {
   const jobs = new Map<string, AbortController>();
+  bind("checkUpdate", checkUpdates);
+  bind("installUpdate", () => {
+    idle();
+    if (jobs.size) throw Error("Wait for Reader to finish before restarting.");
+    installUpdate();
+  });
   bind("deleteChat", async (id: string, scope: "device" | "cloud") => {
     const owner = token;
     const chat = chats.find((c) => c.id === id);
@@ -840,6 +850,7 @@ else {
       handlers();
       restore(secret("device"));
       show();
+      startUpdates(update);
       void refresh();
       void sync();
       setInterval(() => void sync(), 30000).unref();

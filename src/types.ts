@@ -120,6 +120,9 @@ export type State = {
   keys: Provider[];
   chats: Chat[];
   busy: boolean;
+  appVersion: string;
+  updateMessage: string;
+  updateReady: boolean;
   syncError: string;
   historyError: string;
   historyEnabled: boolean;
@@ -138,6 +141,8 @@ export type ReaderRequest = {
   files: ReaderFile[];
 };
 export interface Bridge {
+  checkUpdate(): Promise<void>;
+  installUpdate(): Promise<void>;
   readDocuments(input: ReaderRequest): Promise<string>;
   stopReader(id: string): Promise<void>;
   agents(id: string): Promise<Agent[]>;

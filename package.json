@@ -1,6 +1,8 @@
 {
   "name": "readycode-companion",
   "productName": "ReadyCode Companion",
+  "description": "ReadyCode desktop chat companion",
+  "author": "ReadyCode",
   "version": "1.0.0",
   "license": "MIT",
   "private": true,
@@ -11,18 +13,25 @@
     "start": "npm run build && electron .",
     "test": "node --experimental-strip-types --test tests/*.test.mjs",
     "test:desktop": "node tests/desktop.mjs",
-    "portable": "npm run build && node scripts/portable.mjs"
+    "portable": "npm run build && node scripts/portable.mjs",
+    "installer": "npm run build && electron-builder --config electron-builder.cjs --win nsis --x64 --publish never"
   },
   "dependencies": {
+    "electron-updater": "6.8.11",
     "eventsource-parser": "^3.0.6",
     "react": "^19.2.0",
     "react-dom": "^19.2.0"
+  },
+  "overrides": {
+    "minimatch@^9.0.5": "11.0.1",
+    "minimatch@^10.2.1": "11.0.1"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",
     "@types/react": "^19.2.0",
     "@types/react-dom": "^19.2.0",
     "electron": "^42.0.0",
+    "electron-builder": "26.18.0",
     "esbuild": "^0.25.0",
     "playwright-core": "^1.65.0",
     "prettier": "^3.9.10",

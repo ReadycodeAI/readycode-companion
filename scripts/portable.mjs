@@ -60,7 +60,7 @@ await writeFile(
   JSON.stringify({
     name: "readycode-companion",
     productName: "ReadyCode Companion",
-    version: "1.0.0",
+    version: require("../package.json").version,
     main: "dist/main.cjs",
   }),
 );

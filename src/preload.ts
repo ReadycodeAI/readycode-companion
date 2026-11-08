@@ -1,6 +1,8 @@
 import { contextBridge, ipcRenderer } from "electron";
 import type { Bridge, State } from "./types";
 const api: Bridge = {
+  checkUpdate: () => ipcRenderer.invoke("checkUpdate"),
+  installUpdate: () => ipcRenderer.invoke("installUpdate"),
   readDocuments: (input) => ipcRenderer.invoke("readDocuments", input),
   stopReader: (id) => ipcRenderer.invoke("stopReader", id),
   agents: (id) => ipcRenderer.invoke("agents", id),

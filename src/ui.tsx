@@ -726,6 +726,13 @@ function App() {
             {light ? "☾" : "☼"}
           </button>
         </header>
+        {s.updateReady && (
+          <div className="row" role="status">
+            {s.updateMessage}
+            <button disabled={working || reading || s.busy || !!readerStatus}
+              onClick={() => run(() => api.installUpdate())}>Restart to update</button>
+          </div>
+        )}
         {team && room === team.id && (
           <CloudTeam
             key={team.id}
@@ -774,6 +781,13 @@ function App() {
                 >
                   ×
                 </button>
+              </div>
+              <div className="row">
+                <span>ReadyCode Companion {s.appVersion}</span>
+                {s.updateMessage ? <>
+                  <span role="status">{s.updateMessage}</span>
+                  {!s.updateReady && <button onClick={() => run(() => api.checkUpdate())}>Check for updates</button>}
+                </> : <span>Manual updates for this build</span>}
               </div>
               <label>
                 Provider

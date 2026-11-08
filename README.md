@@ -2,9 +2,13 @@
 
 ReadyCode Companion is a free, MIT-licensed desktop connector for ReadyCode Cloud. Pair your ReadyCode account to keep your full conversations, reduce repeated input on longer chats, and ask several agents in one room. Each successful reply has its own savings receipt.
 
+**Keep the conversation. Send fewer repeated tokens.** In ReadyCode’s synthetic 60-turn chat test, the final Gemini 3 Flash request used an estimated 1,411 input tokens instead of 10,614, an 86.7% reduction for that request. Short conversations can show 0%. Open a saved chat on the desktop or in the web room to continue it. [Savings examples](https://readycode.ai/savings) · [User guide](docs/user-guide.md) · [Web chat room](https://readycode.ai/account/chat-room)
+
 **Cost and availability:** Companion access is currently free for enabled ReadyCode accounts. ReadyCode Cloud may charge for access in the future. AI provider usage is separate and follows your provider’s pricing and quotas. Asking two agents can incur two provider charges. The MIT license covers the desktop source code. ReadyCode runs the compaction and cloud agent services on its servers.
 
 ![Desktop replies showing ReadyCode savings receipts](docs/demo.png)
+
+The MIT license lets you inspect, modify and redistribute the desktop client. The public project includes its user interface, local storage and the requests it makes to ReadyCode. ReadyCode operates the compaction service and cloud agents separately. See [what the desktop distribution contains](SECURITY.md#desktop-and-cloud).
 
 ## Connect a ReadyCode account
 
@@ -45,6 +49,8 @@ Provider keys entered in Companion and device tokens use Electron OS secure stor
 ## Development
 
 Use Node.js 24 and npm. Run `npm ci`, then `npm start`. Run `npm test` for protocol tests and `npm run build && npm run test:desktop` for the Electron test with simulated services. On Windows or macOS, `npm run portable` builds a runnable local edition for the host architecture. The Windows package is unsigned. The macOS build is ad-hoc signed and needs testing on macOS before release.
+
+On Windows x64, run `npm run installer` for a per-user test installer. Official installed copies check GitHub Releases and offer **Restart to update** when the new version is ready. See [Windows releases](docs/windows-releases.md) for signing, profile continuity, and publishing.
 
 The project uses Electron, TypeScript, Vite, React and Tailwind. `src/main.ts` owns IPC and turn execution, `src/network.ts` handles provider streams and ReadyCode requests, and `src/cloud-team.tsx` handles team discovery UI and focused-room polling. See LICENSE and SECURITY.md.
 

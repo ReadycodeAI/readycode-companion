@@ -1,0 +1,77 @@
+name: Windows release
+on:
+  push:
+    tags: ['v*']
+permissions:
+  contents: read
+jobs:
+  installer:
+    runs-on: windows-latest
+    environment: windows-release
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - name: Verify stable version tag
+        shell: pwsh
+        run: |
+          $version = (Get-Content package.json -Raw | ConvertFrom-Json).version
+          if ($version -notmatch '^\d+\.\d+\.\d+$' -or $env:GITHUB_REF_NAME -cne "v$version") { throw 'Tag must match the stable package version.' }
+      - run: npm ci
+      - run: npm test
+      - run: npm run build
+      - run: npm run test:desktop
+      - name: Build signed installer and GitHub update feed
+        run: npm run installer
+        env:
+          READYCODE_OFFICIAL_RELEASE: '1'
+          READYCODE_API_BASE: ${{ vars.READYCODE_API_BASE }}
+          READYCODE_PUBLIC_KEY: ${{ vars.READYCODE_PUBLIC_KEY }}
+          READYCODE_SIGNING_PUBLISHER: ${{ vars.READYCODE_SIGNING_PUBLISHER }}
+          WIN_CSC_LINK: ${{ secrets.WIN_CSC_LINK }}
+          WIN_CSC_KEY_PASSWORD: ${{ secrets.WIN_CSC_KEY_PASSWORD }}
+      - name: Verify installer, update manifest and publisher
+        shell: pwsh
+        run: |
+          $dir = 'release/windows'
+          $name = 'ReadyCode-Companion-Setup-x64.exe'
+          foreach ($file in @("$dir/$name", "$dir/win-unpacked/ReadyCode Companion.exe")) {
+            $sig = Get-AuthenticodeSignature -FilePath $file
+            if ($sig.Status -ne 'Valid' -or $sig.SignerCertificate.GetNameInfo('SimpleName', $false) -cne $env:PUBLISHER) { throw "Unexpected signature for $file" }
+          }
+          $config = Get-Content "$dir/win-unpacked/resources/app-update.yml" -Raw
+          if (!$config.Contains($env:PUBLISHER) -or !$config.Contains('github')) { throw 'Update signing configuration missing.' }
+          $manifest = Get-Content "$dir/latest.yml" -Raw
+          $hash = [Convert]::ToBase64String([System.Security.Cryptography.SHA512]::HashData([IO.File]::ReadAllBytes((Resolve-Path "$dir/$name").Path)))
+          if (!$manifest.Contains($hash) -or !$manifest.Contains($name) -or !(Test-Path "$dir/$name.blockmap")) { throw 'Update assets do not match.' }
+        env:
+          PUBLISHER: ${{ vars.READYCODE_SIGNING_PUBLISHER }}
+      - name: Verify portable profile migration
+        shell: pwsh
+        run: |
+          node scripts/portable.mjs
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          node tests/windows-profile.mjs "release/ReadyCode Companion/ReadyCode Companion.exe" "release/windows/win-unpacked/ReadyCode Companion.exe"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-release
+          path: |
+            release/windows/ReadyCode-Companion-Setup-x64.exe
+            release/windows/ReadyCode-Companion-Setup-x64.exe.blockmap
+            release/windows/latest.yml
+  draft:
+    needs: installer
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: windows-release
+          path: assets
+      - name: Create draft for review
+        run: gh release create "$GITHUB_REF_NAME" assets/* --repo "$GITHUB_REPOSITORY" --verify-tag --draft --generate-notes --title "ReadyCode Companion ${GITHUB_REF_NAME}"
+        env:
+          GH_TOKEN: ${{ github.token }}

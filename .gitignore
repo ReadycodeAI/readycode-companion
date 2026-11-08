@@ -5,3 +5,6 @@ release/
 .env
 .env.*
 !.env.example
+*.pfx
+*.p12
+*.key

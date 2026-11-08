@@ -38,8 +38,9 @@ await Promise.all(
       entryPoints: ["src/" + name + ".ts"],
       bundle: true,
       platform: "node",
-      external: ["electron"],
+      external: ["electron", "electron-updater"],
       define: {
+        "process.env.READYCODE_OFFICIAL_RELEASE": JSON.stringify(process.env.READYCODE_OFFICIAL_RELEASE || ""),
         "process.env.READYCODE_PUBLIC_KEY": JSON.stringify(
           process.env.READYCODE_PUBLIC_KEY || "",
         ),
