@@ -8,6 +8,9 @@ jobs:
   installer:
     runs-on: windows-latest
     environment: windows-release
+    permissions:
+      contents: read
+      id-token: write
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -23,6 +26,13 @@ jobs:
       - run: npm test
       - run: npm run build
       - run: npm run test:desktop
+      - name: Sign in to Azure for managed signing
+        if: vars.AZURE_SIGNING_ACCOUNT != ''
+        uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
       - name: Build signed installer and GitHub update feed
         run: npm run installer
         env:
@@ -30,6 +40,9 @@ jobs:
           READYCODE_API_BASE: ${{ vars.READYCODE_API_BASE }}
           READYCODE_PUBLIC_KEY: ${{ vars.READYCODE_PUBLIC_KEY }}
           READYCODE_SIGNING_PUBLISHER: ${{ vars.READYCODE_SIGNING_PUBLISHER }}
+          AZURE_SIGNING_ACCOUNT: ${{ vars.AZURE_SIGNING_ACCOUNT }}
+          AZURE_SIGNING_PROFILE: ${{ vars.AZURE_SIGNING_PROFILE }}
+          AZURE_SIGNING_ENDPOINT: ${{ vars.AZURE_SIGNING_ENDPOINT }}
           WIN_CSC_LINK: ${{ secrets.WIN_CSC_LINK }}
           WIN_CSC_KEY_PASSWORD: ${{ secrets.WIN_CSC_KEY_PASSWORD }}
       - name: Verify installer, update manifest and publisher

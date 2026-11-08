@@ -5,6 +5,11 @@ if (official && (!/^[\w.-]+\/[\w.-]+$/.test(repository) || !publisher ||
     !process.env.READYCODE_API_BASE || !process.env.READYCODE_PUBLIC_KEY))
   throw Error("Official builds need the GitHub repository, certificate publisher and ReadyCode public configuration.");
 const [owner, repo] = repository.split("/");
+const azureAccount = process.env.AZURE_SIGNING_ACCOUNT;
+const azureProfile = process.env.AZURE_SIGNING_PROFILE;
+const azureEndpoint = process.env.AZURE_SIGNING_ENDPOINT;
+if (official && azureAccount && (!azureProfile || !azureEndpoint?.startsWith("https://")))
+  throw Error("Azure signing requires a profile and its regional HTTPS signing endpoint.");
 module.exports = {
   appId: "ai.readycode.companion",
   productName: "ReadyCode Companion",
@@ -16,7 +21,10 @@ module.exports = {
   win: {
     target: [{target: "nsis", arch: ["x64"]}],
     icon: "assets/readycode.ico",
-    ...(official && {signtoolOptions: {publisherName: [publisher]}}),
+    ...(official && (azureAccount
+      ? {azureSignOptions: {publisherName: publisher, codeSigningAccountName: azureAccount,
+          certificateProfileName: azureProfile, endpoint: azureEndpoint}}
+      : {signtoolOptions: {publisherName: [publisher]}})),
   },
   nsis: {
     oneClick: true, perMachine: false, deleteAppDataOnUninstall: false,
