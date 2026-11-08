@@ -1,7 +1,14 @@
 import { createServer } from "node:http";
 import { randomBytes, randomUUID, createHash } from "node:crypto";
 import { join, dirname } from "node:path";
-import { mkdirSync, readFileSync, writeFileSync, renameSync } from "node:fs";
+import {
+  mkdirSync,
+  readFileSync,
+  writeFileSync,
+  renameSync,
+  readdirSync,
+  statSync,
+} from "node:fs";
 import { writeFile, rm } from "node:fs/promises";
 import { cloud } from "./network";
 import { researchAgents } from "./research";
@@ -25,6 +32,7 @@ export async function openBridge(
   mkdirSync(folder, { recursive: true });
   type Goal = {
     goal: string;
+    roadmap?: string;
     handoffs: Record<string, { revision: string; summary: string }>;
     runs: Record<string, string>;
   };
@@ -69,7 +77,21 @@ export async function openBridge(
       );
       if (name === "project") {
         onProjectRead();
-        reply(200, { root });
+        const recent = readdirSync(folder)
+          .filter((n) => uuid(n.slice(0, -5)) && n.endsWith(".json"))
+          .map((n) => ({
+            id: n.slice(0, -5),
+            mtime: statSync(join(folder, n)).mtimeMs,
+          }))
+          .sort((a, b) => b.mtime - a.mtime)
+          .slice(0, 8);
+        reply(200, {
+          root,
+          recent_goals: recent.map(({ id }) => ({
+            chat_id: id,
+            goal: read(id).goal.slice(0, 160),
+          })),
+        });
         return;
       }
       if (name === "start_goal") {
@@ -85,6 +107,29 @@ export async function openBridge(
         return;
       }
       const state = read(a.chat_id);
+      if (name === "roadmap") {
+        if (a.plan !== undefined) {
+          if (
+            typeof a.plan !== "string" ||
+            !a.plan.trim() ||
+            a.plan.length > 3000
+          )
+            throw Error("Use a short roadmap of at most 3000 characters.");
+          state.roadmap = a.plan;
+          save(a.chat_id, state);
+        }
+        reply(200, {
+          goal: state.goal,
+          plan: state.roadmap ?? "",
+          assignments: Object.keys(state.runs)
+            .slice(-20)
+            .map((id) => ({
+              request_id: id,
+              revision: state.handoffs[id]?.revision,
+            })),
+        });
+        return;
+      }
       if (name === "handoff") {
         if (
           !uuid(a.request_id) ||

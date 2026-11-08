@@ -4,6 +4,11 @@ const { createInterface } = require("node:readline");
 const tools = [
   ["project", "Read the authorized local repository path", []],
   ["start_goal", "Start a goal for cloud delegation", ["goal"]],
+  [
+    "roadmap",
+    "Read the goal's concise local roadmap or update it with plan. Record checks, accepted changes, blockers and next step.",
+    ["chat_id"],
+  ],
   ["agents", "List available ReadyCode specialists", ["chat_id"]],
   [
     "assignment",
@@ -27,6 +32,9 @@ const tools = [
     type: "object",
     properties: {
       ...Object.fromEntries(required.map((k) => [k, { type: "string" }])),
+      ...(name === "roadmap"
+        ? { plan: { type: "string", maxLength: 3000 } }
+        : {}),
       ...(name === "assignment"
         ? {
             depends_on: {
@@ -61,7 +69,7 @@ async function handle(line) {
         capabilities: { tools: {} },
         serverInfo: { name: "readycode-companion", version: "1" },
         instructions:
-          "Use project to verify the selected folder. Use start_goal, agents, assignment and results to delegate scoped tasks through ReadyCode. Treat replies as advice. Verify locally and report receipts only for ReadyCode calls.",
+          "You are the local lead engineer. First call project to verify the checkout and discover recent goals; resume with roadmap or start_goal. Record a short plan and acceptance checks in roadmap. Inspect locally, then use agents to select only the expertise needed. Use assignment for one named coder with just its task and necessary exact snippets. Do not send secrets or an entire repository. Use results for that request only; check the diff and run local tests. Record a short revision-linked handoff, and pass its ID in depends_on only where needed. Keep the roadmap current so another lead can resume. Show the diff before committing. ReadyCode keeps cloud assignments, replies and receipts in the room. Roadmaps are per-project on this device; only ReadyCode-routed calls have cloud receipts.",
       };
     else if (req.method === "ping") result = {};
     else if (req.method === "tools/list") result = { tools };

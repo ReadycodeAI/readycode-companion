@@ -16,7 +16,8 @@ async function launch() {
     args: ["--user-data-dir=" + profile, "."],
     env,
   });
-  const page = await app.firstWindow(); page.setDefaultTimeout(15000);
+  const page = await app.firstWindow();
+  page.setDefaultTimeout(15000);
   await app.evaluate(() => {
     globalThis.catalog = ["first", "second"];
     globalThis.fetch = async (url, opts) => {
@@ -109,14 +110,19 @@ try {
     });
   }, process.cwd());
   await page
-    .getByText("Coding goals · Connect Codex or Cursor", { exact: true })
+    .getByText("Coding goals · Connect your local lead", { exact: true })
     .click();
   await page.getByRole("button", { name: "Choose project folder" }).click();
   await page
-    .getByRole("button", { name: "Enable Codex / Cursor MCP access" })
+    .getByRole("button", { name: "Enable IDE / local model MCP access" })
     .click();
   await page.getByRole("button", { name: "Register in Codex" }).waitFor();
   await page.getByLabel("IDE setup", { exact: true }).selectOption("Cursor");
+  await page.getByText(/Open Cursor Settings/).waitFor();
+  await page
+    .getByLabel("IDE setup", { exact: true })
+    .selectOption("Local model host");
+  await page.getByText(/local model that supports tools/).waitFor();
   const serverJSON = await page
     .locator("pre")
     .filter({ hasText: '"mcpServers"' })
@@ -156,6 +162,19 @@ try {
     await page.getByRole("button", { name: "Check IDE connection" }).click();
     await page.getByText(/Project tool reached Companion/).waitFor();
     const { chat_id } = await tool("start_goal", { goal: "Remember default" });
+    await tool("roadmap", {
+      chat_id,
+      plan: "Verify the second selection after restart",
+    });
+    assert.equal(
+      (await tool("roadmap", { chat_id })).plan,
+      "Verify the second selection after restart",
+    );
+    assert.ok(
+      (await tool("project", {})).recent_goals.some(
+        (g) => g.chat_id === chat_id,
+      ),
+    );
     const agents = await tool("agents", { chat_id });
     const id = randomUUID();
     await tool("assignment", {

@@ -6,12 +6,15 @@ For an external IDE, install Node.js, choose the same project, then select **Ena
 
 | MCP tool | Purpose |
 | --- | --- |
-| project | Check which local checkout was selected. |
+| project | Verify the local checkout and list recent goals for this account and project. |
+| roadmap | Read or update the concise local plan, including checks, accepted changes, blockers and next steps. |
 | start_goal | Create a goal ID for the project. Keep this ID to resume. |
 | agents | Discover cloud specialists available to that goal. |
 | assignment | Send a task to one agent. Reuse its request UUID on retry. Optional depends_on references explicitly saved handoffs. |
 | results | Poll one assignment by request UUID for its reply, run status and receipt. |
 | handoff | Store a short lead-checked result and Git revision on this device for future dependent jobs. |
+
+For a local Llama, Qwen or other tool-capable model, select **Local model host** in setup. Enable the displayed stdio server in a coding host that supports MCP and local file and shell tools. A local model server such as Ollama supplies inference; its host executes requested tool calls. Every MCP session receives the same lead instructions during initialization. Call **project**, then use **Check IDE connection** in Companion to verify the selected folder. Read the existing roadmap before starting new work. Once configured, give the goal in plain language and let the lead pick specialists.
 
 The cloud room keeps the assignments and replies. A local handoff is included in subsequent cloud input when the lead declares the dependency. The existing cloud chat route can also include room history. Per-worker filtering of that history requires backend support. Usage receipts cover ReadyCode-dispatched requests. External IDE model calls follow the IDE's provider configuration.
 

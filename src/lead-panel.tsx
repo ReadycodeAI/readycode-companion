@@ -23,7 +23,7 @@ export function LeadPanel() {
   }
   return (
     <details>
-      <summary>Coding goals · Connect Codex or Cursor</summary>
+      <summary>Coding goals · Connect your local lead</summary>
       {!project && (
         <p>
           Choose the local Git folder you want to work on. Then connect your IDE
@@ -68,7 +68,7 @@ export function LeadPanel() {
               disabled={busy}
               onClick={() => act(async () => setIDE(await api.ideSetup()))}
             >
-              Enable Codex / Cursor MCP access
+              Enable IDE / local model MCP access
             </button>
           )}
           {ide && (
@@ -82,6 +82,7 @@ export function LeadPanel() {
                 >
                   <option>Codex</option>
                   <option>Cursor</option>
+                  <option>Local model host</option>
                 </select>
               </label>
               <p>
@@ -114,10 +115,12 @@ export function LeadPanel() {
               ) : (
                 <>
                   <p>
-                    2. Open Cursor Settings → MCP (Tools &amp; MCP in some
-                    versions). Add a custom stdio server. Merge this entry into
-                    your existing MCP configuration, save it, and enable
-                    readycode-companion.
+                    {client === "Cursor"
+                      ? "2. Open Cursor Settings → MCP (Tools & MCP in some versions)."
+                      : "2. In your coding host, select a local model that supports tools (for example via Ollama). The host must support MCP stdio and provide local file and test tools."}{" "}
+                    Add a custom stdio server using the command and arguments
+                    below. Merge the entry into your host’s configuration and
+                    enable readycode-companion.
                   </p>
                   <pre style={{ whiteSpace: "pre-wrap" }}>
                     {JSON.stringify(
@@ -142,7 +145,8 @@ export function LeadPanel() {
               </p>
               <pre style={{ whiteSpace: "pre-wrap" }}>
                 Use readycode-companion’s project tool and show me the connected
-                folder.
+                folder and any recent coding goals. Read the roadmap before
+                starting new work.
               </pre>
               <button
                 onClick={() =>
