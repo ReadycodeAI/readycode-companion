@@ -374,6 +374,8 @@ function App() {
   const [team, setTeam] = useState<{ id: string; model?: string } | null>(null),
     [pub, setPub] = useState(""),
     [custom, setCustom] = useState("");
+  const [coding, setCoding] = useState(false);
+  const [goalDraft, setGoalDraft] = useState("");
   const [files, setFiles] = useState<Attachment[]>([]),
     [reading, setReading] = useState(false);
   const [removeId, setRemoveId] = useState("");
@@ -440,8 +442,10 @@ function App() {
         .then((list) => {
           if (live) {
             setAgents(list);
-            setAgentId(list[0]?.id || "");
-            setChosenAgents(list[0] ? [list[0].id] : []);
+            const saved = localStorage.getItem("default-cloud-agent");
+            const selected = list.find((agent) => agent.id === saved) ?? list[0];
+            setAgentId(selected?.id || "");
+            setChosenAgents(selected ? [selected.id] : []);
           }
         })
         .catch((e) => {
@@ -501,6 +505,8 @@ function App() {
       : undefined;
   const pollError = useRoomMessages(room);
   function select(v: string) {
+    setCoding(false);
+    setGoalDraft("");
     setTeam(null);
     newId(v);
 
@@ -539,10 +545,14 @@ function App() {
     documents.length === 1
       ? "Summarize this document and cite the relevant passages."
       : "Summarize these documents and cite the relevant passages.";
-  const question = draft.trim() || (documents.length ? documentQuestion : "");
+  const savedGoal = chat?.turns.map(t => /^Coding goal: ([^\n]+)\nAssignment: /.exec(t.prompt)?.[1]).find(Boolean);
+  const goal = savedGoal || goalDraft.trim();
+  const assigning = agentMode && !roomMode && coding;
+  const message = draft.trim() || (documents.length ? documentQuestion : "");
+  const question = assigning && goal && message ? `Coding goal: ${goal}\nAssignment: ${message}` : message;
   const hasMessage = !!question || files.length > 0;
   async function send() {
-    if (!s?.paired || s.busy || working || reading || !hasMessage) return;
+    if (!s?.paired || s.busy || working || reading || !hasMessage || (assigning && (!goal || !message))) return;
     let prompt: string;
     try {
       prompt = attachmentPrompt(question, files);
@@ -1305,7 +1315,11 @@ function App() {
                               aria-label="Cloud agent"
                               disabled={!agents.length}
                               value={agentId}
-                              onChange={(e) => setAgentId(e.target.value)}
+                              title="Your choice is saved as the default on this device"
+                              onChange={(e) => {
+                                localStorage.setItem("default-cloud-agent", e.target.value);
+                                setAgentId(e.target.value);
+                              }}
                             >
                               {!agents.length && (
                                 <option value="">
@@ -1377,6 +1391,16 @@ function App() {
                         </>
                       )}
                     </p>
+                  )}
+                  {agentMode && !roomMode && (
+                    <div>
+                      <label><input type="checkbox" checked={coding}
+                        onChange={e => setCoding(e.target.checked)} /> Coding goal</label>
+                      {coding && <label> Goal <input aria-label="Coding goal description"
+                        maxLength={500} value={goalDraft || savedGoal || ""} readOnly={!!savedGoal}
+                        onChange={e => setGoalDraft(e.target.value)}
+                        placeholder="What should work when finished?" /></label>}
+                    </div>
                   )}
                   {agentMode && roomMode && agents.length > 0 && (
                     <fieldset className="room-picker">
@@ -1538,7 +1562,7 @@ function App() {
                         documents.length
                           ? documentQuestion
                           : agentMode
-                            ? "Message your ReadyCode agent…"
+                            ? assigning ? "Give the selected agent its assignment…" : "Message your ReadyCode agent…"
                             : "Message ReadyCode…"
                       }
                       value={draft}
@@ -1562,7 +1586,7 @@ function App() {
                       <button
                         className="primary"
                         disabled={
-                          !canResearch || !hasMessage || reading || working
+                          !canResearch || !hasMessage || reading || working || (assigning && (!goal || !message))
                         }
                         onClick={() => void send()}
                       >
@@ -1570,7 +1594,7 @@ function App() {
                           ? "Send to " +
                             chosenAgents.length +
                             (chosenAgents.length === 1 ? " agent" : " agents")
-                          : "Send ↑"}
+                          : assigning ? "Send assignment" : "Send ↑"}
                       </button>
                     ) : hasKey ? (
                       <button
