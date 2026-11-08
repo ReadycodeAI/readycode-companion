@@ -6,6 +6,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   setBase,
+  setCustom,
   setPublicKey,
   testProviderKey,
   compact,
@@ -58,18 +59,45 @@ test("cloud access denial blocks compaction", async (t) => {
   fixture(t, async () => new Response(null, { status: 402 }));
   await assert.rejects(cloud("compact", "device-test", {}), /plan/);
 });
+test("every provider sends the exact messages returned by /compact", async (t) => {
+  const returned = [
+    { role: "system", content: "  first\n", name: "instructions" },
+    { role: "user", content: "  repeated  " },
+    { role: "user", content: "  repeated  " },
+    { role: "assistant", content: "" },
+    { role: "system", content: "\nsecond\r\n" },
+    { role: "user", content: "last" },
+  ];
+  setCustom("https://custom.example/v1");
+  t.after(() => setCustom(""));
+  const sent = [];
+  fixture(t, async (url, options) => {
+    if (url.endsWith("/compact"))
+      return response({ compacted_messages: returned, receipt });
+    const body = JSON.parse(options.body);
+    assert.deepEqual(body.messages, returned);
+    assert.ok(!("system" in body));
+    sent.push(url);
+    return new Response('data: [DONE]\n\n');
+  });
+  const result = await compact("device-test", "chat", "model", messages, signal);
+  for (const p of ["OpenRouter", "GroqCloud", "OpenAI", "Anthropic", "Custom"])
+    await stream(p, "provider-test", "model", result.messages, signal, () => {});
+  assert.deepEqual(sent, [
+    "https://openrouter.ai/api/v1/chat/completions",
+    "https://api.groq.com/openai/v1/chat/completions",
+    "https://api.openai.com/v1/chat/completions",
+    "https://api.anthropic.com/v1/chat/completions",
+    "https://custom.example/v1/chat/completions",
+  ]);
+});
 for (const p of ["OpenRouter", "GroqCloud", "OpenAI", "Anthropic"])
   test(p + " streams fragmented UTF-8 SSE to the end marker", async (t) => {
-    const anthropic = p === "Anthropic";
-    const delta = anthropic
-      ? { type: "content_block_delta", delta: { text: "Hi 🌱" } }
-      : { choices: [{ delta: { content: "Hi 🌱" } }] };
+    const delta = { choices: [{ delta: { content: "Hi 🌱" } }] };
     const bytes = new TextEncoder().encode(
       ": keep-alive\r\n\r\ndata: " +
         JSON.stringify(delta) +
-        "\r\n\r\ndata: " +
-        (anthropic ? '{"type":"message_stop"}' : "[DONE]") +
-        "\r\n\r\n",
+        "\r\n\r\ndata: [DONE]\r\n\r\n",
     );
     fixture(t, async (url, opts) => {
       assert.equal(
@@ -81,10 +109,9 @@ for (const p of ["OpenRouter", "GroqCloud", "OpenAI", "Anthropic"])
           Anthropic: "api.anthropic.com",
         }[p],
       );
-      assert.equal(
-        opts.headers[anthropic ? "x-api-key" : "Authorization"],
-        anthropic ? "provider-test" : "Bearer provider-test",
-      );
+      if (p === "Anthropic")
+        assert.equal(url, "https://api.anthropic.com/v1/chat/completions");
+      assert.equal(opts.headers.Authorization, "Bearer provider-test");
       assert.ok(!JSON.stringify(opts).includes("device-test"));
       return new Response(
         new ReadableStream({

@@ -248,9 +248,7 @@ export async function compact(
   )
     throw Error("ReadyCode returned an invalid compaction result.");
   return {
-    messages: (data.compacted_messages as Message[]).map(
-      ({ role, content }) => ({ role, content }),
-    ),
+    messages: data.compacted_messages as Message[],
     receipt,
   };
 }
@@ -262,7 +260,7 @@ const destinations: Record<Provider, string> = {
   OpenRouter: "https://openrouter.ai/api/v1/chat/completions",
   GroqCloud: "https://api.groq.com/openai/v1/chat/completions",
   OpenAI: "https://api.openai.com/v1/chat/completions",
-  Anthropic: "https://api.anthropic.com/v1/messages",
+  Anthropic: "https://api.anthropic.com/v1/chat/completions",
 };
 export async function stream(
   provider: Provider,
@@ -272,28 +270,14 @@ export async function stream(
   signal: AbortSignal,
   append: (text: string) => void,
 ) {
-  const anthropic = provider === "Anthropic";
-  const system = messages
-    .filter((m) => m.role === "system")
-    .map((m) => m.content)
-    .join("\n\n");
-  const body = anthropic
-    ? {
-        model,
-        messages: messages.filter((m) => m.role !== "system"),
-        ...(system ? { system } : {}),
-        max_tokens: 8192,
-        stream: true,
-      }
-    : {
-        model,
-        messages,
-        stream: true,
-        ...(provider === "OpenRouter" ? { usage: { include: true } } : {}),
-      };
-  const headers: Record<string, string> = anthropic
-    ? { "x-api-key": key, "anthropic-version": "2023-06-01" }
-    : { Authorization: "Bearer " + key };
+  const body = {
+    model,
+    messages,
+    stream: true,
+    ...(provider === "Anthropic" ? { max_tokens: 8192 } : {}),
+    ...(provider === "OpenRouter" ? { usage: { include: true } } : {}),
+  };
+  const headers = { Authorization: "Bearer " + key };
   const result = await fetch(destinations[provider], {
     method: "POST",
     redirect: "error",
@@ -322,7 +306,7 @@ export async function stream(
   const parser = createParser({
     onEvent: ({ data }) => {
       if (done) return;
-      if (!anthropic && data === "[DONE]") {
+      if (data === "[DONE]") {
         done = true;
         return;
       }
@@ -333,10 +317,6 @@ export async function stream(
         event.choices?.[0]?.finish_reason === "error"
       )
         throw Error(provider + " interrupted the stream.");
-      if (anthropic && event.type === "message_stop") {
-        done = true;
-        return;
-      }
       const u =
         provider === "GroqCloud"
           ? (event.x_groq?.usage ?? event.usage)
@@ -357,9 +337,7 @@ export async function stream(
           ),
         );
       }
-      const delta = anthropic
-        ? event.delta?.text
-        : event.choices?.[0]?.delta?.content;
+      const delta = event.choices?.[0]?.delta?.content;
       if (typeof delta === "string") append(delta);
     },
   });
