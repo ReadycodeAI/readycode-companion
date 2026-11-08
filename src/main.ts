@@ -423,6 +423,8 @@ function handlers() {
   let candidate: Candidate | undefined;
   let leadBusy=false, leadOwner="";
   let closeBridge:(()=>Promise<void>)|undefined;
+  let checkedAt="";
+  bind("ideStatus",()=>closeBridge && token===leadOwner ? checkedAt || "waiting" : "disabled");
   const disconnectBridge=async()=>{await closeBridge?.();closeBridge=undefined};
   const bridgePaths=()=>({script:app.isPackaged?join(process.resourcesPath,"ide-mcp.cjs"):join(app.getAppPath(),"scripts","ide-mcp.cjs"),
     descriptor:join(app.getPath("userData"),"ide-session.json")});
@@ -430,7 +432,8 @@ function handlers() {
     if(!project||!token||token!==leadOwner)throw Error("Choose a project first.");
     await disconnectBridge();
     const {descriptor,script}=bridgePaths();
-    closeBridge=await openBridge(descriptor,project.root,()=>token);
+    checkedAt="";
+    closeBridge=await openBridge(descriptor,project.root,()=>token,()=>{checkedAt=new Date().toISOString()});
     return {script,descriptor};
   });
   bind("registerCodex",async()=>{

@@ -2,6 +2,7 @@ import { contextBridge, ipcRenderer } from "electron";
 import type { Bridge, State } from "./types";
 const api: Bridge = {
   ideSetup:()=>ipcRenderer.invoke("ideSetup"),
+  ideStatus:()=>ipcRenderer.invoke("ideStatus"),
   registerCodex:()=>ipcRenderer.invoke("registerCodex"),
   disconnectIDE:()=>ipcRenderer.invoke("disconnectIDE"),
   connectProject: () => ipcRenderer.invoke("connectProject"),

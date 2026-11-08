@@ -149,6 +149,7 @@ export type ReaderRequest = {
 export interface Bridge {
   ideSetup:()=>Promise<{script:string;descriptor:string}>;
   registerCodex:()=>Promise<void>;
+  ideStatus:()=>Promise<string>;
   disconnectIDE:()=>Promise<void>;
   connectProject: () => Promise<string>;
   leadGoal: (goal:string) => Promise<{report:string;diff:string;branch:string;room:string}>;

@@ -11,6 +11,7 @@ export async function openBridge(
   file: string,
   root: string,
   owner: () => string,
+  onProjectRead: () => void = () => {},
 ) {
   const account = owner(),
     key = randomBytes(32).toString("hex");
@@ -67,6 +68,7 @@ export async function openBridge(
         Buffer.concat(chunks).toString("utf8"),
       );
       if (name === "project") {
+        onProjectRead();
         reply(200, { root });
         return;
       }

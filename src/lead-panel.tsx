@@ -8,6 +8,7 @@ export function LeadPanel() {
   const [result, setResult] =
     useState<Awaited<ReturnType<typeof api.leadGoal>>>();
   const [ide, setIDE] = useState<Awaited<ReturnType<typeof api.ideSetup>>>();
+  const [client, setClient] = useState("Codex");
   useEffect(() => api.leadProgress(setStatus), []);
   async function act(fn: () => Promise<void>) {
     setBusy(true);
@@ -22,7 +23,13 @@ export function LeadPanel() {
   }
   return (
     <details>
-      <summary>Coding goals · Local Codex lead</summary>
+      <summary>Coding goals · Connect Codex or Cursor</summary>
+      {!project && (
+        <p>
+          Choose the local Git folder you want to work on. Then connect your IDE
+          or run Codex from Companion.
+        </p>
+      )}
       <button
         disabled={busy}
         onClick={() =>
@@ -66,42 +73,105 @@ export function LeadPanel() {
           )}
           {ide && (
             <div>
+              <label>
+                Set up{" "}
+                <select
+                  aria-label="IDE setup"
+                  value={client}
+                  onChange={(e) => setClient(e.target.value)}
+                >
+                  <option>Codex</option>
+                  <option>Cursor</option>
+                </select>
+              </label>
               <p>
-                With Node.js installed, register Companion in Codex or add the
-                JSON below to Cursor’s MCP settings. Start a new IDE session in
-                the same project and ask it to use readycode-companion for your
-                goal.
+                1. Install Node.js 22 or newer on this computer and open the
+                selected folder in {client}.
               </p>
+              {client === "Codex" ? (
+                <>
+                  <p>
+                    2. Sign in to the Codex CLI, then register Companion using
+                    the button. You can also run the command below yourself.
+                  </p>
+                  <button
+                    disabled={busy}
+                    onClick={() =>
+                      act(async () => {
+                        await api.registerCodex();
+                        setStatus(
+                          "Registered. Start a new Codex session in this project.",
+                        );
+                      })
+                    }
+                  >
+                    Register in Codex
+                  </button>
+                  <pre
+                    style={{ whiteSpace: "pre-wrap" }}
+                  >{`codex mcp add readycode-companion -- node "${ide.script}" "${ide.descriptor}"`}</pre>
+                </>
+              ) : (
+                <>
+                  <p>
+                    2. Open Cursor Settings → MCP (Tools &amp; MCP in some
+                    versions). Add a custom stdio server. Merge this entry into
+                    your existing MCP configuration, save it, and enable
+                    readycode-companion.
+                  </p>
+                  <pre style={{ whiteSpace: "pre-wrap" }}>
+                    {JSON.stringify(
+                      {
+                        mcpServers: {
+                          "readycode-companion": {
+                            command: "node",
+                            args: [ide.script, ide.descriptor],
+                          },
+                        },
+                      },
+                      null,
+                      2,
+                    )}
+                  </pre>
+                </>
+              )}
+              <p>
+                3. Start a new {client} chat. Send the prompt below and approve
+                the project tool if asked. The returned path should match the
+                folder above.
+              </p>
+              <pre style={{ whiteSpace: "pre-wrap" }}>
+                Use readycode-companion’s project tool and show me the connected
+                folder.
+              </pre>
               <button
-                disabled={busy}
                 onClick={() =>
                   act(async () => {
-                    await api.registerCodex();
+                    const state = await api.ideStatus();
                     setStatus(
-                      "Registered. Start a new Codex session in this project.",
+                      state === "waiting"
+                        ? "Waiting for the IDE to call the project tool. Check the server is enabled, Node is on PATH, and the tool call is approved."
+                        : state === "disabled"
+                          ? "IDE access is disabled."
+                          : "Project tool reached Companion at " +
+                            new Date(state).toLocaleTimeString(),
                     );
                   })
                 }
               >
-                Register in Codex
+                Check IDE connection
               </button>
-              <pre
-                style={{ whiteSpace: "pre-wrap" }}
-              >{`codex mcp add readycode-companion -- node "${ide.script}" "${ide.descriptor}"`}</pre>
+              <p>4. Give your goal to the IDE. For example:</p>
               <pre style={{ whiteSpace: "pre-wrap" }}>
-                {JSON.stringify(
-                  {
-                    mcpServers: {
-                      "readycode-companion": {
-                        command: "node",
-                        args: [ide.script, ide.descriptor],
-                      },
-                    },
-                  },
-                  null,
-                  2,
-                )}
+                Remember my preferred AI after restarting Companion. Lead this
+                locally. Use readycode-companion to give each cloud specialist a
+                distinct assignment, check their replies, run the restart test
+                and show me the diff before committing.
               </pre>
+              <p>
+                Keep Companion open. After restarting it, choose the folder and
+                enable IDE access again. The IDE registration can be reused.
+              </p>
               <button
                 onClick={() =>
                   act(async () => {

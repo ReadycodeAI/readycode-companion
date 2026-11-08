@@ -16,7 +16,7 @@ async function launch() {
     args: ["--user-data-dir=" + profile, "."],
     env,
   });
-  const page = await app.firstWindow();
+  const page = await app.firstWindow(); page.setDefaultTimeout(15000);
   await app.evaluate(() => {
     globalThis.catalog = ["first", "second"];
     globalThis.fetch = async (url, opts) => {
@@ -108,10 +108,23 @@ try {
       filePaths: [path],
     });
   }, process.cwd());
-  const { script, descriptor } = await page.evaluate(async () => {
-    await window.companion.connectProject();
-    return window.companion.ideSetup();
-  });
+  await page
+    .getByText("Coding goals · Connect Codex or Cursor", { exact: true })
+    .click();
+  await page.getByRole("button", { name: "Choose project folder" }).click();
+  await page
+    .getByRole("button", { name: "Enable Codex / Cursor MCP access" })
+    .click();
+  await page.getByRole("button", { name: "Register in Codex" }).waitFor();
+  await page.getByLabel("IDE setup", { exact: true }).selectOption("Cursor");
+  const serverJSON = await page
+    .locator("pre")
+    .filter({ hasText: '"mcpServers"' })
+    .innerText();
+  const [script, descriptor] =
+    JSON.parse(serverJSON).mcpServers["readycode-companion"].args;
+  await page.getByRole("button", { name: "Check IDE connection" }).click();
+  await page.getByText(/Waiting for the IDE to call/).waitFor();
   const cli = spawn(process.execPath, [script, descriptor], {
     stdio: ["pipe", "pipe", "inherit"],
   });
@@ -136,6 +149,12 @@ try {
       (await rpc("initialize", { protocolVersion: "2025-06-18" })).capabilities
         .tools,
     );
+    assert.equal(
+      (await tool("project", {})).root.replaceAll("\\", "/"),
+      process.cwd().replaceAll("\\", "/"),
+    );
+    await page.getByRole("button", { name: "Check IDE connection" }).click();
+    await page.getByText(/Project tool reached Companion/).waitFor();
     const { chat_id } = await tool("start_goal", { goal: "Remember default" });
     const agents = await tool("agents", { chat_id });
     const id = randomUUID();
