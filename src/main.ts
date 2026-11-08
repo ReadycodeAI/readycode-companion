@@ -64,6 +64,8 @@ let active: AbortController | null = null,
   pairing = false,
   verified = false;
 const submitting = new Set<string>();
+const deleting = new Set<string>();
+let removedIds = new Set<string>();
 let syncError = "",
   historyError = "";
 const page = join(__dirname, "index.html");
@@ -103,17 +105,26 @@ function update() {
     window.webContents.send("update", state());
 }
 function save() {
-  persist(token, chats);
+  persist(token, chats, removedIds);
   update();
 }
 function message(e: unknown) {
   return e instanceof Error ? e.message : "Request failed.";
 }
 function idle() {
-  if (active || syncing || reading || pairing || submitting.size)
+  if (
+    active ||
+    syncing ||
+    reading ||
+    pairing ||
+    submitting.size ||
+    deleting.size
+  )
     throw Error("Wait for the current request to finish.");
 }
-function restore(value: string, next = loadChats(value)) {
+function restore(value: string, snapshot = loadChats(value)) {
+  const next = snapshot.chats;
+  removedIds = new Set(snapshot.removedIds);
   for (const chat of next)
     for (const turn of chat.turns)
       for (const reply of turn.replies) {
@@ -141,7 +152,7 @@ async function refresh() {
       throw Error("ReadyCode could not verify this device.");
     const data = await (await cloud("chats", owner, {})).json();
     if (owner !== token) return;
-    mergeHistory(chats, data);
+    mergeHistory(chats, data, removedIds);
     verified = true;
     historyError = "";
     save();
@@ -182,7 +193,13 @@ async function sync() {
     for (const chat of chats)
       for (const turn of chat.turns)
         for (const r of turn.replies) {
-          if (chat.cloudUnavailable || r.sync !== "queued") continue;
+          if (
+            deleting.has(chat.id) ||
+            removedIds.has(chat.id) ||
+            chat.cloudUnavailable ||
+            r.sync !== "queued"
+          )
+            continue;
           if (
             !r.receipt?.id ||
             turn.prompt.length > 60000 ||
@@ -230,6 +247,8 @@ async function sync() {
   }
 }
 function requireAvailableChat(id: string) {
+  if (deleting.has(id) || removedIds.has(id))
+    throw Error("This chat has been removed or is being deleted.");
   if (chats.find((chat) => chat.id === id)?.cloudUnavailable)
     throw Error(
       "This chat is no longer available on ReadyCode. Start a new chat.",
@@ -380,6 +399,49 @@ function bind(name: string, fn: (...args: any[]) => unknown) {
 }
 function handlers() {
   const jobs = new Map<string, AbortController>();
+  bind("deleteChat", async (id: string, scope: "device" | "cloud") => {
+    const owner = token;
+    const chat = chats.find((c) => c.id === id);
+    if (!owner || !chat || !["device", "cloud"].includes(scope))
+      throw Error("Choose a chat on this device.");
+    idle();
+    if (jobs.size)
+      throw Error("Wait for Reader to finish before removing a chat.");
+    deleting.add(id);
+    try {
+      if (scope === "cloud") {
+        if (!chat.roomId || chat.cloudUnavailable)
+          throw Error("Only a saved ReadyCode chat can be deleted online.");
+        const ack = await (
+          await cloud("delete_chat", owner, {
+            chat_id: id,
+            room_id: chat.roomId,
+          })
+        ).json();
+        if (
+          ack.ok !== true ||
+          ack.deleted !== true ||
+          ack.chat_id !== id ||
+          ack.room_id !== chat.roomId
+        )
+          throw Error(
+            "ReadyCode did not confirm deletion. The local copy was kept.",
+          );
+      }
+      if (owner !== token) throw Error("The connected account changed.");
+      const remaining = chats.filter((c) => c.id !== id);
+      const hidden = new Set(removedIds).add(id);
+      persist(owner, remaining, hidden);
+      chats = remaining;
+      removedIds = hidden;
+      update();
+    } catch (e) {
+      cloudFailure(e, owner);
+      throw e;
+    } finally {
+      deleting.delete(id);
+    }
+  });
   bind("stopReader", (id: string) => jobs.get(id)?.abort());
   bind("readDocuments", async (input: ReaderRequest) => {
     const owner = token;

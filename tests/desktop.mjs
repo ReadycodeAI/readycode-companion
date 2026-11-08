@@ -157,7 +157,12 @@ try {
               status: 401,
             })
           : Response.json({ ok: true });
-      if (url.endsWith("/chats")) return Response.json({ chats: [] });
+      if (url.endsWith("/chats"))
+        return Response.json({ chats: globalThis.cleanupChats ?? [] });
+      if (url.endsWith("/delete_chat"))
+        return globalThis.allowDelete
+          ? Response.json({ ok: true, deleted: true, ...body })
+          : Response.json({ message: "Deletion refused" }, { status: 403 });
       if (url.endsWith("/messages") && globalThis.removedChat === body.chat_id)
         return Response.json({ error: "unknown_chat" }, { status: 404 });
       if (url.endsWith("/messages"))
@@ -778,6 +783,66 @@ try {
   assert.equal(await countReads(), reads);
   await win.getByRole("button", { name: "Start a new chat" }).click();
   await win.getByRole("heading", { name: "Start a conversation" }).waitFor();
+  await desktop.evaluate(() => {
+    globalThis.cleanupChats = [
+      { chat_id: "keep-cloud", room_id: "room-1", title: "Keep cloud copy" },
+      {
+        chat_id: "delete-cloud",
+        room_id: "room-2",
+        title: "Delete both copies",
+      },
+    ];
+  });
+  await win.evaluate(() => window.companion.refresh());
+  const removeLocal = win.getByRole("button", {
+    name: "Remove chat: Keep cloud copy",
+  });
+  await removeLocal.click();
+  await win.getByRole("button", { name: "Cancel", exact: true }).click();
+  await removeLocal.click();
+  await win
+    .getByRole("button", { name: "Remove from this device", exact: true })
+    .click();
+  await removeLocal.waitFor({ state: "detached" });
+  await win.evaluate(() => window.companion.refresh());
+  assert.equal(await removeLocal.count(), 0);
+  assert.equal(
+    await desktop.evaluate(
+      () =>
+        globalThis.calls.filter((c) => c.url.endsWith("/delete_chat")).length,
+    ),
+    0,
+  );
+  const removeBoth = win.getByRole("button", {
+    name: "Remove chat: Delete both copies",
+  });
+  await removeBoth.click();
+  await win
+    .getByRole("radio", { name: "Delete here and on ReadyCode" })
+    .check();
+  await win
+    .getByRole("button", { name: "Delete here and on ReadyCode" })
+    .click();
+  await win.getByText("Deletion refused", { exact: true }).waitFor();
+  assert.equal(await removeBoth.count(), 1);
+  await desktop.evaluate(() => {
+    globalThis.allowDelete = true;
+  });
+  await win
+    .getByRole("button", { name: "Delete here and on ReadyCode" })
+    .click();
+  await removeBoth.waitFor({ state: "detached" });
+  const deleted = await desktop.evaluate(() =>
+    globalThis.calls.filter((c) => c.url.endsWith("/delete_chat")),
+  );
+  assert.ok(
+    deleted.every(
+      (c) =>
+        c.body.chat_id === "delete-cloud" &&
+        c.body.room_id === "room-2" &&
+        c.headers.Authorization === "Bearer rcd_fixture",
+    ),
+  );
   await desktop.evaluate(() => {
     globalThis.revoked = true;
   });

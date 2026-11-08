@@ -49,6 +49,99 @@ function Mark() {
     </svg>
   );
 }
+function RemoveChatDialog({
+  title,
+  online,
+  close,
+  remove,
+}: {
+  title: string;
+  online: boolean;
+  close: () => void;
+  remove: (scope: "device" | "cloud") => Promise<void>;
+}) {
+  const dialog = useRef<HTMLDialogElement>(null);
+  const [scope, setScope] = useState<"device" | "cloud">("device");
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState("");
+  useEffect(() => {
+    dialog.current?.showModal();
+  }, []);
+  return (
+    <dialog
+      ref={dialog}
+      className="team-dialog"
+      aria-labelledby="remove-title"
+      onCancel={(e) => {
+        e.preventDefault();
+        if (!pending) close();
+      }}
+    >
+      <h2 id="remove-title">Remove “{title}”?</h2>
+      <label>
+        <input
+          type="radio"
+          checked={scope === "device"}
+          disabled={pending}
+          onChange={() => setScope("device")}
+        />{" "}
+        Remove from this device
+      </label>
+      <p>
+        The cached messages are removed from this device. Any turns already
+        saved to ReadyCode stay in your online account. Unsynced turns will be
+        lost.
+      </p>
+      {online && (
+        <>
+          <label>
+            <input
+              type="radio"
+              checked={scope === "cloud"}
+              disabled={pending}
+              onChange={() => setScope("cloud")}
+            />{" "}
+            Delete here and on ReadyCode
+          </label>
+          <p>
+            This also deletes the online conversation and its replies from your
+            ReadyCode history.
+          </p>
+        </>
+      )}
+      {error && <p role="alert">{error}</p>}
+      <div className="buttons">
+        <button autoFocus disabled={pending} onClick={close}>
+          Cancel
+        </button>
+        <button
+          disabled={pending}
+          onClick={async () => {
+            setPending(true);
+            setError("");
+            try {
+              await remove(scope);
+            } catch (e) {
+              setError(
+                String((e as Error).message).replace(
+                  /^Error invoking remote method '[^']+': Error: /,
+                  "",
+                ),
+              );
+              setPending(false);
+            }
+          }}
+        >
+          {pending
+            ? "Removing…"
+            : scope === "cloud"
+              ? "Delete here and on ReadyCode"
+              : "Remove from this device"}
+        </button>
+      </div>
+    </dialog>
+  );
+}
 function Ticket({ r }: { r: Receipt }) {
   const [expanded, setExpanded] = useState(false);
   return (
@@ -267,6 +360,7 @@ function App() {
     [custom, setCustom] = useState("");
   const [files, setFiles] = useState<Attachment[]>([]),
     [reading, setReading] = useState(false);
+  const [removeId, setRemoveId] = useState("");
   const [documents, setDocuments] = useState<File[]>([]),
     [readerStatus, setReaderStatus] = useState(false);
   const readerRequest = useRef<{
@@ -584,14 +678,24 @@ function App() {
         <div className="section-label">Conversations</div>
         <nav>
           {s.chats.map((c) => (
-            <button
-              className={id === c.id ? "selected" : ""}
-              key={c.id}
-              onClick={() => select(c.id)}
-            >
-              {c.title}
-              {c.cloudUnavailable ? " · Local copy" : ""}
-            </button>
+            <div className="chat-nav-row" key={c.id}>
+              <button
+                className={id === c.id ? "selected" : ""}
+                onClick={() => select(c.id)}
+              >
+                {c.title}
+                {c.cloudUnavailable ? " · Local copy" : ""}
+              </button>
+              <button
+                className="remove-chat"
+                disabled={working || s.busy || reading || readerStatus}
+                aria-label={"Remove chat: " + c.title}
+                title="Remove chat"
+                onClick={() => setRemoveId(c.id)}
+              >
+                ×
+              </button>
+            </div>
           ))}
           {!s.chats.length && <small>Your chats will appear here.</small>}
         </nav>
@@ -630,6 +734,22 @@ function App() {
             close={() => setTeam(null)}
           />
         )}
+        {s.paired &&
+          s.chats
+            .filter((c) => c.id === removeId)
+            .map((c) => (
+              <RemoveChatDialog
+                key={c.id}
+                title={c.title}
+                online={!!c.roomId && !c.cloudUnavailable}
+                close={() => setRemoveId("")}
+                remove={async (scope) => {
+                  await api.deleteChat(c.id, scope);
+                  setRemoveId("");
+                  if (id === c.id) select(crypto.randomUUID());
+                }}
+              />
+            ))}
         {pollError && <p className="alert">{pollError}</p>}
         {error && (
           <div className="alert" role="alert">

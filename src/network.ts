@@ -51,6 +51,7 @@ export function pairCode(value: string) {
 export class DeviceRevoked extends Error {}
 export async function cloud(
   path:
+    | "delete_chat"
     | "pair"
     | "status"
     | "compact"
@@ -101,6 +102,14 @@ export async function cloud(
         "ReadyCode returned HTTP " + result.status + ".",
       );
     const data = await result.json().catch(() => ({}));
+    if (
+      path === "delete_chat" &&
+      result.status === 404 &&
+      data.error === "not_found"
+    )
+      throw Error(
+        "Cloud deletion is unavailable on this ReadyCode server. You can still remove the local copy.",
+      );
     if (
       result.status === 404 &&
       data.error === "not_found" &&

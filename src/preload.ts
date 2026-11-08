@@ -13,6 +13,7 @@ const api: Bridge = {
   apiAddress: (v, k) => ipcRenderer.invoke("apiAddress", v, k),
   testKey: (p, v) => ipcRenderer.invoke("testKey", p, v),
   readChat: (id) => ipcRenderer.invoke("readChat", id),
+  deleteChat: (id, scope) => ipcRenderer.invoke("deleteChat", id, scope),
   state: () => ipcRenderer.invoke("state"),
   listen: (fn) => {
     const receive = (_: unknown, s: State) => fn(s);

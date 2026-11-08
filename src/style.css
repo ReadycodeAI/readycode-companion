@@ -148,6 +148,20 @@ nav small {
   font-size: 12px;
   padding: 0 10px;
 }
+.chat-nav-row {
+  display: flex;
+  align-items: center;
+}
+.chat-nav-row button:first-child {
+  flex: 1;
+  min-width: 0;
+}
+.shell nav .remove-chat {
+  width: auto;
+  flex: none;
+  padding: 4px 8px;
+  color: var(--muted);
+}
 .side-foot {
   border-top: 1px solid var(--line);
   padding-top: 9px;

@@ -1,6 +1,8 @@
-# ReadyCode Desktop
+# ReadyCode Companion
 
-ReadyCode Desktop is an MIT-licensed frontend for ReadyCode Cloud. Pair a ReadyCode account to chat, compact conversation history, save completed turns and use the Cloud Team. The composer stays locked until pairing succeeds.
+ReadyCode Companion is a free, MIT-licensed desktop connector for ReadyCode Cloud. Pair your ReadyCode account to keep your full conversations, reduce repeated input on longer chats, and ask several agents in one room. Each successful reply has its own savings receipt.
+
+**Cost and availability:** Companion access is currently free for enabled ReadyCode accounts. ReadyCode Cloud may charge for access in the future. AI provider usage is separate and follows your provider’s pricing and quotas. Asking two agents can incur two provider charges. The MIT license covers the desktop source code. ReadyCode runs the compaction and cloud agent services on its servers.
 
 ![Desktop replies showing ReadyCode savings receipts](docs/demo.png)
 
@@ -13,6 +15,8 @@ After pairing, choose a provider in Settings and save its key. GroqCloud offers 
 For every provider reply, the main process calls the authenticated `/compact` endpoint with the full turn context. It passes only the returned messages to the provider. An unreachable cloud service, invalid receipt, rejected device, or failed comparison compaction stops provider dispatch. Each completed answer shows the estimated input-token reduction and original and compacted counts beneath the text. Short passthrough turns show **Optimal context · 0% compaction needed**. Failed history uploads can be retried with their original receipt. Cached history remains on this device; unpaired history from older versions is never uploaded automatically.
 
 ## Providers and text files
+
+To clean up your sidebar, click **×** beside a chat. **Remove from this device** removes the cached transcript and keeps any synced conversation in your web account. Companion remembers the removal for this pairing. **Delete here and on ReadyCode** asks ReadyCode to delete the synced conversation and removes the local copy only after the server confirms. If the server refuses or is unavailable, the local copy stays. Other computers can retain their own cached copies.
 
 GroqCloud is the default starting option and has a free plan with limits. ReadyCode Agents runs on ReadyCode with the account’s cloud credentials. OpenRouter, OpenAI, Anthropic and Custom are optional independent connections, each with its own key. Use **Other providers…** to configure one. All user chat submissions go through ReadyCode.
 
@@ -36,7 +40,7 @@ In a paired chat, choose **ReadyCode Agents** beside GroqCloud in the provider m
 
 ## Privacy
 
-Provider keys and device tokens use Electron OS secure storage. Provider requests originate on the desktop. ReadyCode receives the device token, conversation context for paired compaction, and completed synced turns, receipts and available usage data. Cloud Team discovery returns provider/model names and a room URL. Local transcript caches are JSON files in the OS user profile. No telemetry or analytics. The renderer is sandboxed with isolated context and blocked network access.
+Provider keys entered in Companion and device tokens use Electron OS secure storage. When you select a direct provider, Companion calls it from your desktop after ReadyCode compacts the context. ReadyCode Agents and Ask the room run in the cloud with credentials configured in your ReadyCode account. ReadyCode receives conversation context for compaction and saves completed synced turns, receipts and available usage data. Local transcript caches are JSON files in the OS user profile. The desktop includes no telemetry or analytics. The renderer is sandboxed with isolated context and blocked network access.
 
 ## Development
 

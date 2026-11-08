@@ -48,11 +48,13 @@ export function saveSecret(id: Secret, value: string) {
 function cache(token: string) {
   return "history-" + createHash("sha256").update(token).digest("hex");
 }
-export function loadChats(token: string): Chat[] {
-  return token ? read<Chat[]>(cache(token), []) : [];
+type HistoryCache = { chats: Chat[]; removedIds: string[] };
+export function loadChats(token: string): HistoryCache {
+  const data = token ? read<HistoryCache | Chat[]>(cache(token), []) : [];
+  return Array.isArray(data) ? { chats: data, removedIds: [] } : data;
 }
-export function persist(token: string, chats: Chat[]) {
-  if (token) write(cache(token), chats);
+export function persist(token: string, chats: Chat[], removedIds: Set<string>) {
+  if (token) write(cache(token), { chats, removedIds: [...removedIds] });
 }
 export const readAddress = (fallback: string) =>
   read<string>("api-address", fallback);

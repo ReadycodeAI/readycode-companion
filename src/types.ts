@@ -170,6 +170,7 @@ export interface Bridge {
     value: string,
   ): Promise<void>;
   readChat(id: string): Promise<void>;
+  deleteChat(id: string, scope: "device" | "cloud"): Promise<void>;
   refresh(): Promise<void>;
 }
 declare global {

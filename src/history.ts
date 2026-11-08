@@ -17,7 +17,11 @@ export function context(chat: Chat): Message[] {
         : [];
   });
 }
-export function mergeHistory(local: Chat[], data: any) {
+export function mergeHistory(
+  local: Chat[],
+  data: any,
+  removedIds?: Set<string>,
+) {
   if (!Array.isArray(data?.chats)) throw Error("Invalid ReadyCode chat list.");
   for (const c of data.chats) {
     if (
@@ -28,6 +32,7 @@ export function mergeHistory(local: Chat[], data: any) {
     )
       throw Error("Invalid cloud chat.");
     const chat = local.find((v) => v.id === c.chat_id);
+    if (removedIds?.has(c.chat_id)) continue;
     if (chat) {
       chat.title = c.title;
       chat.roomId = c.room_id;
