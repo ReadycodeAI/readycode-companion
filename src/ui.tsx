@@ -815,6 +815,8 @@ function App() {
               </div>
               <div className="row">
                 <span>ReadyCode Companion {s.appVersion}</span>
+                {!s.updateReady && <button disabled={working || reading || s.busy || !!readerStatus}
+                  onClick={() => run(() => api.restart())}>Restart Companion</button>}
                 {s.updateMessage ? <>
                   <span role="status">{s.updateMessage}</span>
                   {!s.updateReady && <button onClick={() => run(() => api.checkUpdate())}>Check for updates</button>}

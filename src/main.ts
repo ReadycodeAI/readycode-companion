@@ -470,9 +470,17 @@ function handlers() {
   });
   const jobs = new Map<string, AbortController>();
   bind("checkUpdate", checkUpdates);
-  bind("installUpdate", () => {
+  function requireRestartable() {
     idle();
-    if (jobs.size) throw Error("Wait for Reader to finish before restarting.");
+    if (jobs.size || leadBusy) throw Error("Wait for the current Reader or coding job to finish before restarting.");
+  }
+  bind("restart", () => {
+    requireRestartable();
+    app.relaunch();
+    app.quit();
+  });
+  bind("installUpdate", () => {
+    requireRestartable();
     installUpdate();
   });
   bind("deleteChat", async (id: string, scope: "device" | "cloud") => {

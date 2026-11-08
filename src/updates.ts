@@ -3,18 +3,19 @@ import { existsSync } from "node:fs";
 import { join } from "node:path";
 import type { AppUpdater } from "electron-updater";
 
-const officialWindows = process.platform === "win32" && app.isPackaged &&
-  process.env.READYCODE_OFFICIAL_RELEASE === "1";
+const preview = process.env.READYCODE_PREVIEW_RELEASE === "1" && process.env.READYCODE_OFFICIAL_RELEASE !== "1";
+const managedWindows = process.platform === "win32" && app.isPackaged &&
+  (preview || process.env.READYCODE_OFFICIAL_RELEASE === "1");
 let updater: AppUpdater | undefined;
 export let updateMessage = "";
 export let updateReady = false;
 export function startUpdates(notify: () => void) {
-  if (!officialWindows || !existsSync(join(process.resourcesPath, "app-update.yml"))) return;
+  if (!managedWindows || !existsSync(join(process.resourcesPath, "app-update.yml"))) return;
   // Portable builds ship without updater dependencies.
   updater = require("electron-updater").autoUpdater as AppUpdater;
   updater.autoInstallOnAppQuit = false;
   updater.allowDowngrade = false;
-  updater.allowPrerelease = false;
+  updater.allowPrerelease = preview;
   const report = (text: string) => { updateMessage = text; notify(); };
   updater.on("checking-for-update", () => report("Checking for updates…"));
   updater.on("update-not-available", () => report("You have the latest version."));

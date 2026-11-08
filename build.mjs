@@ -41,6 +41,7 @@ await Promise.all(
       external: ["electron", "electron-updater"],
       define: {
         "process.env.READYCODE_OFFICIAL_RELEASE": JSON.stringify(process.env.READYCODE_OFFICIAL_RELEASE || ""),
+        "process.env.READYCODE_PREVIEW_RELEASE": JSON.stringify(process.env.READYCODE_PREVIEW_RELEASE || ""),
         "process.env.READYCODE_PUBLIC_KEY": JSON.stringify(
           process.env.READYCODE_PUBLIC_KEY || "",
         ),

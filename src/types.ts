@@ -156,6 +156,7 @@ export interface Bridge {
   saveLead: () => Promise<string>;
   leadProgress: (fn:(s:string)=>void) => () => void;
   checkUpdate(): Promise<void>;
+  restart(): Promise<void>;
   installUpdate(): Promise<void>;
   readDocuments(input: ReaderRequest): Promise<string>;
   stopReader(id: string): Promise<void>;

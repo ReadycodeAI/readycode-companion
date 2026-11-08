@@ -1,4 +1,7 @@
 const official = process.env.READYCODE_OFFICIAL_RELEASE === "1";
+const preview = !official && process.env.READYCODE_PREVIEW_RELEASE === "1";
+if (preview && (!process.env.READYCODE_API_BASE || !process.env.READYCODE_PUBLIC_KEY))
+  throw Error("Preview installers require the public ReadyCode pairing configuration.");
 const repository = process.env.GITHUB_REPOSITORY || "";
 const publisher = process.env.READYCODE_SIGNING_PUBLISHER?.trim();
 if (official && (!/^[\w.-]+\/[\w.-]+$/.test(repository) || !publisher ||
@@ -18,7 +21,8 @@ module.exports = {
   files: ["dist/**/*", "package.json"],
   extraResources: [{from:"scripts/ide-mcp.cjs",to:"ide-mcp.cjs"}],
   forceCodeSigning: official,
-  publish: official ? [{provider: "github", owner, repo}] : null,
+  publish: official ? [{provider: "github", owner, repo}] :
+    preview ? [{provider: "github", owner: "ReadycodeAI", repo: "readycode-companion"}] : null,
   win: {
     target: [{target: "nsis", arch: ["x64"]}],
     icon: "assets/readycode.ico",

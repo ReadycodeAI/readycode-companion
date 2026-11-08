@@ -14,6 +14,7 @@ const api: Bridge = {
     return ()=>{ipcRenderer.removeListener("leadProgress",cb)};
   },
   checkUpdate: () => ipcRenderer.invoke("checkUpdate"),
+  restart: () => ipcRenderer.invoke("restart"),
   installUpdate: () => ipcRenderer.invoke("installUpdate"),
   readDocuments: (input) => ipcRenderer.invoke("readDocuments", input),
   stopReader: (id) => ipcRenderer.invoke("stopReader", id),
