@@ -2,7 +2,7 @@
 
 ## Start on Windows
 
-Once a public release is available, download the Windows x64 installer from ReadyCode’s download page or the official GitHub release. Install it under the Windows account you use for chat. If you used the portable app, close it first. Open Companion, select **Connect ReadyCode Account**, sign in and enter the eight-character code from [device pairing](https://readycode.ai/account/device/pair). If an upgrade asks you to pair again, use the same ReadyCode account, then check your synced conversations in the sidebar and [web chat room](https://readycode.ai/account/chat-room).
+Download the [Windows x64 preview](https://github.com/ReadycodeAI/readycode-companion/releases/tag/preview-windows-1.0.0). This installer is unsigned. Follow the release notes to verify its checksum and handle the Windows publisher prompt. Install it under the Windows account you use for chat. If you used the portable app, close it first. Open Companion, select **Connect ReadyCode Account**, sign in and enter the eight-character code from [device pairing](https://readycode.ai/account/device/pair). If an upgrade asks you to pair again, use the same ReadyCode account, then check your synced conversations in the sidebar and [web chat room](https://readycode.ai/account/chat-room).
 
 ## Send your first message
 
