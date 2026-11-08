@@ -16,6 +16,7 @@ module.exports = {
   electronDist: require("node:path").dirname(require("electron")),
   directories: { output: "release/windows" },
   files: ["dist/**/*", "package.json"],
+  extraResources: [{from:"scripts/ide-mcp.cjs",to:"ide-mcp.cjs"}],
   forceCodeSigning: official,
   publish: official ? [{provider: "github", owner, repo}] : null,
   win: {

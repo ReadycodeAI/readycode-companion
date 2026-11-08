@@ -17,6 +17,7 @@ import {
   type Turn,
   type Receipt,
 } from "./types";
+import {LeadPanel} from "./lead-panel";
 const api = window.companion;
 const fmt = (n: number) => n.toLocaleString("en-US");
 function SavingsExample({ open }: { open: () => void }) {
@@ -755,6 +756,7 @@ function App() {
             {light ? "☾" : "☼"}
           </button>
         </header>
+        {s.paired && <LeadPanel/>}
         {s.updateReady && (
           <div className="row" role="status">
             {s.updateMessage}

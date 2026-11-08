@@ -1,6 +1,17 @@
 import { contextBridge, ipcRenderer } from "electron";
 import type { Bridge, State } from "./types";
 const api: Bridge = {
+  ideSetup:()=>ipcRenderer.invoke("ideSetup"),
+  registerCodex:()=>ipcRenderer.invoke("registerCodex"),
+  disconnectIDE:()=>ipcRenderer.invoke("disconnectIDE"),
+  connectProject: () => ipcRenderer.invoke("connectProject"),
+  leadGoal: goal => ipcRenderer.invoke("leadGoal",goal),
+  saveLead: () => ipcRenderer.invoke("saveLead"),
+  leadProgress: fn => {
+    const cb=(_:unknown,s:string)=>fn(s);
+    ipcRenderer.on("leadProgress",cb);
+    return ()=>{ipcRenderer.removeListener("leadProgress",cb)};
+  },
   checkUpdate: () => ipcRenderer.invoke("checkUpdate"),
   installUpdate: () => ipcRenderer.invoke("installUpdate"),
   readDocuments: (input) => ipcRenderer.invoke("readDocuments", input),

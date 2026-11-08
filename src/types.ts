@@ -147,6 +147,13 @@ export type ReaderRequest = {
   files: ReaderFile[];
 };
 export interface Bridge {
+  ideSetup:()=>Promise<{script:string;descriptor:string}>;
+  registerCodex:()=>Promise<void>;
+  disconnectIDE:()=>Promise<void>;
+  connectProject: () => Promise<string>;
+  leadGoal: (goal:string) => Promise<{report:string;diff:string;branch:string;room:string}>;
+  saveLead: () => Promise<string>;
+  leadProgress: (fn:(s:string)=>void) => () => void;
   checkUpdate(): Promise<void>;
   installUpdate(): Promise<void>;
   readDocuments(input: ReaderRequest): Promise<string>;

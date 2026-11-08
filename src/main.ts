@@ -1,4 +1,10 @@
 import { readerContext } from "./reader";
+import {connectLead,runLead,saveLead,type Candidate} from "./local-lead";
+import {dialog} from "electron";
+import {execFile} from "node:child_process";
+import {promisify} from "node:util";
+import {tmpdir} from "node:os";
+import {openBridge} from "./ide-bridge";
 import { startUpdates, checkUpdates, installUpdate, updateMessage, updateReady } from "./updates";
 import type { ReaderRequest } from "./types";
 import { researchAgents, sourceList, updateResearch } from "./research";
@@ -413,6 +419,52 @@ function bind(name: string, fn: (...args: any[]) => unknown) {
   });
 }
 function handlers() {
+  let project: Awaited<ReturnType<typeof connectLead>> | undefined;
+  let candidate: Candidate | undefined;
+  let leadBusy=false, leadOwner="";
+  let closeBridge:(()=>Promise<void>)|undefined;
+  const disconnectBridge=async()=>{await closeBridge?.();closeBridge=undefined};
+  const bridgePaths=()=>({script:app.isPackaged?join(process.resourcesPath,"ide-mcp.cjs"):join(app.getAppPath(),"scripts","ide-mcp.cjs"),
+    descriptor:join(app.getPath("userData"),"ide-session.json")});
+  bind("ideSetup",async()=>{
+    if(!project||!token||token!==leadOwner)throw Error("Choose a project first.");
+    await disconnectBridge();
+    const {descriptor,script}=bridgePaths();
+    closeBridge=await openBridge(descriptor,project.root,()=>token);
+    return {script,descriptor};
+  });
+  bind("registerCodex",async()=>{
+    if(!closeBridge||!token||leadOwner!==token)throw Error("Enable the project connection first.");
+    const {script,descriptor}=bridgePaths();
+    const run=promisify(execFile);
+    await run("node",["--version"],{cwd:tmpdir(),windowsHide:true,timeout:10000});
+    await run(process.platform==="win32"?"codex.exe":"codex",["mcp","add","readycode-companion","--","node",script,descriptor],{cwd:tmpdir(),windowsHide:true,timeout:20000});
+  });
+  bind("disconnectIDE",disconnectBridge);
+  bind("connectProject",async()=>{
+    if(!window||!token||leadBusy) throw Error("Pair your account and wait for any active goal.");
+    const choice=await dialog.showOpenDialog(window,{title:"Choose a trusted Git project for Codex",properties:["openDirectory"]});
+    if(choice.canceled) return "";
+    await disconnectBridge();
+    project=await connectLead(choice.filePaths[0]);
+    leadOwner=token;
+    candidate=undefined;
+    return project.root+" · "+project.base.slice(0,8);
+  });
+  bind("leadGoal",async(goal:string)=>{
+    if(!project||!token||token!==leadOwner||leadBusy||typeof goal!=="string"||!goal.trim()||goal.length>4000) throw Error("Connect a project and enter one goal.");
+    leadBusy=true;candidate=undefined;
+    try {
+      candidate=await runLead(project,goal.trim(),join(app.getPath("userData"),"goal-worktrees"),()=>token,s=>window?.webContents.send("leadProgress",s));
+      const {report,diff,branch,room}=candidate;
+      return {report,diff,branch,room};
+    } finally {leadBusy=false}
+  });
+  bind("saveLead",async()=>{
+    if(leadBusy||!candidate||!token||token!==leadOwner) throw Error("No reviewed candidate available.");
+    leadBusy=true;
+    try {const sha=await saveLead(candidate);candidate=undefined;return sha} finally {leadBusy=false}
+  });
   const jobs = new Map<string, AbortController>();
   bind("checkUpdate", checkUpdates);
   bind("installUpdate", () => {
@@ -791,6 +843,7 @@ function handlers() {
   });
   bind("unlink", () => {
     idle();
+    void disconnectBridge();
     saveSecret("device", "");
     restore("");
   });
