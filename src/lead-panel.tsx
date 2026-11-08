@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 const api = window.companion;
-export function LeadPanel() {
+export function LeadPanel({panelRef}:{panelRef:React.Ref<HTMLDetailsElement>}) {
   const [project, setProject] = useState(""),
     [goal, setGoal] = useState(""),
     [busy, setBusy] = useState(false),
@@ -22,14 +22,26 @@ export function LeadPanel() {
     }
   }
   return (
-    <details>
+    <details className="lead-setup" ref={panelRef}>
       <summary>Coding goals · Connect your local lead</summary>
       {!project && (
         <p>
-          Choose the local Git folder you want to work on. Then connect your IDE
-          or run Codex from Companion.
+          Select your IDE or local model host. Setup will ask for the Git folder you want it to work on.
         </p>
       )}
+      <label>IDE or model host{" "}
+        <select aria-label="IDE setup" value={client} onChange={e=>setClient(e.target.value)}>
+          <option>Codex</option><option>Cursor</option><option>Local model host</option>
+        </select>
+      </label>
+      {!ide && <button disabled={busy} onClick={()=>act(async()=>{
+        if(!project){
+          const p=await api.connectProject();
+          if(!p)return;
+          setProject(p);
+        }
+        setIDE(await api.ideSetup());
+      })}>Set up {client} connection</button>}
       <button
         disabled={busy}
         onClick={() =>
@@ -63,28 +75,8 @@ export function LeadPanel() {
             replies are saved in ReadyCode. The IDE uses its own account for its
             other calls.
           </p>
-          {!ide && (
-            <button
-              disabled={busy}
-              onClick={() => act(async () => setIDE(await api.ideSetup()))}
-            >
-              Enable IDE / local model MCP access
-            </button>
-          )}
           {ide && (
             <div>
-              <label>
-                Set up{" "}
-                <select
-                  aria-label="IDE setup"
-                  value={client}
-                  onChange={(e) => setClient(e.target.value)}
-                >
-                  <option>Codex</option>
-                  <option>Cursor</option>
-                  <option>Local model host</option>
-                </select>
-              </label>
               <p>
                 1. Install Node.js 22 or newer on this computer and open the
                 selected folder in {client}.

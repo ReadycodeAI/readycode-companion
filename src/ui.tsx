@@ -363,6 +363,7 @@ class ReplyBoundary extends React.Component<
   }
 }
 function App() {
+  const leadPanelRef=useRef<HTMLDetailsElement>(null);
   const [s, setState] = useState<State | null>(null),
     [error, setError] = useState(""),
     [settings, setSettings] = useState(false);
@@ -730,6 +731,10 @@ function App() {
           {!s.chats.length && <small>Your chats will appear here.</small>}
         </nav>
         <div className="side-foot">
+          {s.paired && <button onClick={()=>{
+            setSettings(false);
+            if(leadPanelRef.current){leadPanelRef.current.open=true;leadPanelRef.current.scrollIntoView({block:"nearest"});leadPanelRef.current.querySelector("select")?.focus();}
+          }}>IDE &amp; MCP setup</button>}
           <button onClick={() => void run(() => api.open("history"))}>
             ↗ &nbsp; Cloud chat room
           </button>
@@ -756,7 +761,7 @@ function App() {
             {light ? "☾" : "☼"}
           </button>
         </header>
-        {s.paired && <LeadPanel/>}
+        {s.paired && <LeadPanel panelRef={leadPanelRef}/>}
         {s.updateReady && (
           <div className="row" role="status">
             {s.updateMessage}

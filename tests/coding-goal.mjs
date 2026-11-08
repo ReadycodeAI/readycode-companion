@@ -109,12 +109,10 @@ try {
       filePaths: [path],
     });
   }, process.cwd());
+  await page.getByRole("button",{name:"IDE & MCP setup"}).click();
+  await page.getByLabel("IDE setup",{exact:true}).waitFor();
   await page
-    .getByText("Coding goals · Connect your local lead", { exact: true })
-    .click();
-  await page.getByRole("button", { name: "Choose project folder" }).click();
-  await page
-    .getByRole("button", { name: "Enable IDE / local model MCP access" })
+    .getByRole("button", { name: "Set up Codex connection" })
     .click();
   await page.getByRole("button", { name: "Register in Codex" }).waitFor();
   await page.getByLabel("IDE setup", { exact: true }).selectOption("Cursor");

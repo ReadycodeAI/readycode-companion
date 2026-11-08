@@ -166,6 +166,10 @@ nav small {
   border-top: 1px solid var(--line);
   padding-top: 9px;
 }
+.lead-setup { padding: .65rem 1.25rem; border-bottom: 1px solid var(--border); max-height: 55vh; overflow: auto; }
+.lead-setup summary { cursor: pointer; }
+.lead-setup[open] summary { margin-bottom: .65rem; }
+.lead-setup button, .lead-setup select { margin: .25rem .4rem .25rem 0; }
 .shell main {
   display: flex;
   flex-direction: column;

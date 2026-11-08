@@ -2,7 +2,7 @@
 
 Pair Companion, open **Coding goals · Local Codex lead**, and choose a trusted Git project. The built-in lead starts from the selected HEAD in a separate worktree. Uncommitted changes in the original checkout are outside that snapshot. Install and sign in to the Codex CLI, enter a goal, and select **Run goal with two agents**. Codex chooses two distinct account agents and assigns them separate tasks sequentially in the same ReadyCode room. Review the report, test evidence and diff before choosing **Keep as local commit**. The commit is on the displayed local goal branch. Building dependencies and running tests in a fresh worktree depends on your local environment.
 
-For an external IDE, install Node.js, choose the same project, then select **Enable Codex / Cursor MCP access**. For Codex choose **Register in Codex**. For Cursor add the displayed server entry to its MCP settings. Start a new IDE session and tell its lead to use readycode-companion. Re-enable project access in Companion after a restart. The local adapter connects to the running paired desktop app. Keep its session descriptor private.
+For an external IDE, install Node.js and open **IDE & MCP setup** in the sidebar. Pick Codex, Cursor, or Local model host, then choose **Set up … connection**. Select a local Git folder in the picker. For Codex choose **Register in Codex**. For Cursor add the displayed server entry to its MCP settings. Start a new IDE session and tell its lead to use readycode-companion. Re-enable project access in Companion after a restart. The local adapter connects to the running paired desktop app. Keep its session descriptor private.
 
 | MCP tool | Purpose |
 | --- | --- |
