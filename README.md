@@ -1,8 +1,12 @@
 # ReadyCode Companion
 
-ReadyCode Companion is a free, MIT-licensed desktop connector for ReadyCode Cloud. Pair your ReadyCode account to keep your full conversations, reduce repeated input on longer chats, and ask several agents in one room. Each successful reply has its own savings receipt.
+ReadyCode Companion is a free, MIT-licensed desktop AI companion and multi-agent harness powered by ReadyCode Cloud.
 
-**Keep the conversation. Send fewer repeated tokens.** In ReadyCode’s synthetic 60-turn chat test, the final Gemini 3 Flash request used an estimated 1,411 input tokens instead of 10,614, an 86.7% reduction for that request. Short conversations can show 0%. Open a saved chat on the desktop or in the web room to continue it. [Savings examples](https://readycode.ai/savings) · [User guide](docs/user-guide.md) · [Web chat room](https://readycode.ai/account/chat-room)
+- **Free AI harness.** Pair your ReadyCode account and bring a supported provider key, or start with a GroqCloud key on its free plan. Select **Ask the room** to get separate replies from your configured cloud agents in one chat. Attach a PDF, Word document or spreadsheet to ask about cited passages with ReadyCode Reader.
+- **ReadyCode optimization.** ReadyCode keeps the full synced conversation in your account and reduces repeated context on its servers. Each new successful reply has its own savings receipt with estimated input tokens before and after compaction. Short chats can pass through whole.
+- **Private and open.** The desktop client is MIT-licensed and includes no telemetry. Keys entered in the desktop app use OS secure storage. ReadyCode Agents uses the credentials you configure in your cloud account.
+
+In ReadyCode’s synthetic 60-turn chat test, the final Gemini 3 Flash request used an estimated **1,411 input tokens instead of 10,614**, an 86.7% reduction for that request. [Savings examples](https://readycode.ai/savings) · [User guide](docs/user-guide.md) · [Web chat room](https://readycode.ai/account/chat-room)
 
 **Cost and availability:** Companion access is currently free for enabled ReadyCode accounts. ReadyCode Cloud may charge for access in the future. AI provider usage is separate and follows your provider’s pricing and quotas. Asking two agents can incur two provider charges. The MIT license covers the desktop source code. ReadyCode runs the compaction and cloud agent services on its servers.
 
