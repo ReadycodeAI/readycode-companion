@@ -60,6 +60,8 @@ export async function cloud(
     | "cloud_team"
     | "research_agents"
     | "research_run"
+    | "room_run"
+    | "room_retry"
     | "reader_context"
     | "reader_result",
   token: string,
@@ -99,6 +101,14 @@ export async function cloud(
         "ReadyCode returned HTTP " + result.status + ".",
       );
     const data = await result.json().catch(() => ({}));
+    if (
+      result.status === 404 &&
+      data.error === "not_found" &&
+      (path === "room_run" || path === "room_retry")
+    )
+      throw Error(
+        "Ask the room is not available on this ReadyCode server yet.",
+      );
     if (result.status === 404 && data.error === "unknown_chat")
       throw new UnknownCloudChat(
         "This chat is no longer available on ReadyCode.",

@@ -441,76 +441,146 @@ function handlers() {
       throw e;
     }
   });
-  bind("research", async (id: string, agentId: string, prompt: string) => {
+  bind(
+    "research",
+    async (id: string, selection: string | string[], prompt: string) => {
+      requireAvailableChat(id);
+      const owner = token;
+      if (!owner) throw Error("Pair ReadyCode to use cloud agents.");
+      const agents = Array.isArray(selection) ? selection : [selection];
+      const agentId = agents[0];
+      if (
+        typeof id !== "string" ||
+        !/^[\w.:-]{1,100}$/.test(id) ||
+        !agents.length ||
+        agents.length > 8 ||
+        new Set(agents).size !== agents.length ||
+        agents.some(
+          (a) => typeof a !== "string" || !a.trim() || a.length > 160,
+        ) ||
+        typeof prompt !== "string" ||
+        !prompt.trim() ||
+        prompt.length > 60000
+      )
+        throw Error(
+          "Select an agent and enter a question of up to 60,000 characters.",
+        );
+      if (submitting.has(id) || active)
+        throw Error("Wait for the current request to finish.");
+      let chat = chats.find((c) => c.id === id);
+      if (!chat) {
+        chat = {
+          id,
+          title: Array.from(prompt.trim()).slice(0, 40).join(""),
+          turns: [],
+        };
+        chats.unshift(chat);
+      }
+      const previous = chat.research;
+      if (previous && ["queued", "running"].includes(previous.status))
+        throw Error("This chat already has a research run in progress.");
+      if (
+        previous?.status === "unconfirmed" &&
+        (previous.agentId !== agentId ||
+          JSON.stringify(previous.agentIds) !==
+            JSON.stringify(Array.isArray(selection) ? agents : undefined) ||
+          previous.prompt !== prompt)
+      )
+        throw Error(
+          "Retry the unconfirmed submission before starting another run.",
+        );
+      const run: Research =
+        previous?.status === "unconfirmed"
+          ? previous
+          : {
+              requestId: randomUUID(),
+              agentId,
+              agentIds: Array.isArray(selection) ? agents : undefined,
+              prompt,
+              status: "submitting",
+            };
+      if (previous?.agentIds && previous.runId && previous !== run) {
+        const rounds = (chat.rounds ??= []);
+        if (!rounds.some((r) => r.requestId === previous.requestId))
+          rounds.push(previous);
+      }
+      submitting.add(id);
+      chat.research = run;
+      run.status = "submitting";
+      run.error = undefined;
+      try {
+        save();
+        const response = await cloud(
+          run.agentIds ? "room_run" : "research_run",
+          owner,
+          {
+            chat_id: id,
+            request_id: run.requestId,
+            ...(run.agentIds
+              ? { agent_ids: run.agentIds }
+              : { agent_id: agentId }),
+            prompt,
+          },
+        );
+        if (owner !== token) return;
+        try {
+          updateResearch(chat, run, await response.json());
+        } catch {
+          throw new CloudUnavailable(
+            "Could not confirm the research run. Retry with the same request.",
+          );
+        }
+        save();
+      } catch (e) {
+        if (owner === token) {
+          run.status = e instanceof CloudUnavailable ? "unconfirmed" : "failed";
+          run.error = message(e);
+          save();
+          cloudFailure(e, owner);
+        }
+        throw e;
+      } finally {
+        submitting.delete(id);
+      }
+    },
+  );
+  bind("retryAgent", async (id: string, runId: string, agent: string) => {
     requireAvailableChat(id);
     const owner = token;
-    if (!owner) throw Error("Pair ReadyCode to use cloud agents.");
+    const chat = chats.find((c) => c.id === id);
+    const round = [chat?.research, ...(chat?.rounds ?? [])].find(
+      (r) => r?.runId === runId,
+    );
     if (
-      typeof id !== "string" ||
-      !/^[\w.:-]{1,100}$/.test(id) ||
-      typeof agentId !== "string" ||
-      !agentId.trim() ||
-      agentId.length > 160 ||
-      typeof prompt !== "string" ||
-      !prompt.trim() ||
-      prompt.length > 60000
+      !owner ||
+      !chat ||
+      !round ||
+      !round.participants?.some(
+        (p) => p.agent_id === agent && p.status === "failed",
+      )
     )
-      throw Error(
-        "Select an agent and enter a question of up to 60,000 characters.",
-      );
-    if (submitting.has(id) || active)
+      throw Error("Choose a failed reply in this room.");
+    if (submitting.has(id))
       throw Error("Wait for the current request to finish.");
-    let chat = chats.find((c) => c.id === id);
-    if (!chat) {
-      chat = {
-        id,
-        title: Array.from(prompt.trim()).slice(0, 40).join(""),
-        turns: [],
-      };
-      chats.unshift(chat);
-    }
-    const previous = chat.research;
-    if (previous && ["queued", "running"].includes(previous.status))
-      throw Error("This chat already has a research run in progress.");
-    if (
-      previous?.status === "unconfirmed" &&
-      (previous.agentId !== agentId || previous.prompt !== prompt)
-    )
-      throw Error(
-        "Retry the unconfirmed submission before starting another run.",
-      );
-    const run: Research =
-      previous?.status === "unconfirmed"
-        ? previous
-        : { requestId: randomUUID(), agentId, prompt, status: "submitting" };
     submitting.add(id);
-    chat.research = run;
-    run.status = "submitting";
-    run.error = undefined;
+    const attempts = (round.retryIds ??= {});
+    const requestId = (attempts[agent] ??= randomUUID());
     try {
       save();
-      const response = await cloud("research_run", owner, {
-        chat_id: id,
-        request_id: run.requestId,
-        agent_id: agentId,
-        prompt,
-      });
+      const ack = await (
+        await cloud("room_retry", owner, {
+          chat_id: id,
+          run_id: runId,
+          agent_id: agent,
+          request_id: requestId,
+        })
+      ).json();
       if (owner !== token) return;
-      try {
-        updateResearch(chat, run, await response.json());
-      } catch {
-        throw new CloudUnavailable(
-          "Could not confirm the research run. Retry with the same request.",
-        );
-      }
+      updateResearch(chat, round, ack);
+      delete attempts[agent];
       save();
     } catch (e) {
-      if (owner === token) {
-        run.status = e instanceof CloudUnavailable ? "unconfirmed" : "failed";
-        run.error = message(e);
-        save();
-        cloudFailure(e, owner);
-      }
+      cloudFailure(e, owner);
       throw e;
     } finally {
       submitting.delete(id);

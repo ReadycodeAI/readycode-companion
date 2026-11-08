@@ -51,6 +51,14 @@ export type Source = { title: string; url: string };
 export type Research = {
   requestId: string;
   agentId: string;
+  agentIds?: string[];
+  participants?: {
+    agent_id: string;
+    label: string;
+    status: "queued" | "running" | "completed" | "failed";
+    error?: string;
+  }[];
+  retryIds?: Record<string, string>;
   prompt: string;
   status:
     | "submitting"
@@ -92,6 +100,7 @@ export type Chat = {
   cloudUnavailable?: boolean;
   remoteLoaded?: boolean;
   research?: Research;
+  rounds?: Research[];
 };
 export type Team = {
   roomId: string;
@@ -132,7 +141,8 @@ export interface Bridge {
   readDocuments(input: ReaderRequest): Promise<string>;
   stopReader(id: string): Promise<void>;
   agents(id: string): Promise<Agent[]>;
-  research(id: string, agent: string, prompt: string): Promise<void>;
+  research(id: string, agent: string | string[], prompt: string): Promise<void>;
+  retryAgent(id: string, run: string, agent: string): Promise<void>;
   openSource(id: string, messageId: string, index: number): Promise<void>;
   state(): Promise<State>;
   listen(fn: (s: State) => void): () => void;

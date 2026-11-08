@@ -30,6 +30,8 @@ While a synced chat is open and focused, Companion reads messages every 15 secon
 
 ## Chat and web research from the composer
 
+Choose **ReadyCode Agents → Ask the room**, select the agents you want, and use **Send to N agents**. One agent is selected initially. Each selected agent may incur provider charges. Companion submits one round to ReadyCode; the cloud saves one user message and each successful reply with its own savings receipt. You can retry an individual failed reply. The companion service must support `room_run`, `room_retry` and room updates on `messages`.
+
 In a paired chat, choose **ReadyCode Agents** beside GroqCloud in the provider menu, pick an available cloud agent, and press **Send**. The server decides whether the request needs web research. Conversational replies can have an empty sources list and still carry a savings receipt. This requires automatic routing on the ReadyCode backend. The cloud service must implement `research_agents`, `research_run`, and the research fields on `messages`. This also supports starting a fresh paired chat. The desktop sends your question to ReadyCode using the device token and leaves the provider and search credentials on the server. It shows the run status, then the agent’s answer and numbered sources as they arrive in the room. Click a source to open its website. Research dispatch uses the authenticated `/research_run` endpoint directly. Cloud replies display the server-issued `receipt` from `/messages` when available. If a reply predates receipt support or the backend omits the receipt, the UI reports that it is unavailable.
 
 ## Privacy

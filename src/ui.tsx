@@ -311,6 +311,8 @@ function App() {
     ),
     [agents, setAgents] = useState<Agent[]>([]),
     [agentId, setAgentId] = useState(""),
+    [roomMode, setRoomMode] = useState(false),
+    [chosenAgents, setChosenAgents] = useState<string[]>([]),
     [agentError, setAgentError] = useState(""),
     [catalogVersion, reloadCatalog] = useState(0),
     [catalogBusy, setCatalogBusy] = useState(false);
@@ -318,6 +320,7 @@ function App() {
     let live = true;
     setAgents([]);
     setAgentId("");
+    setChosenAgents([]);
     setAgentError("");
     setCatalogBusy(false);
     if (agentMode && s?.paired && !settings) {
@@ -328,6 +331,7 @@ function App() {
           if (live) {
             setAgents(list);
             setAgentId(list[0]?.id || "");
+            setChosenAgents(list[0] ? [list[0].id] : []);
           }
         })
         .catch((e) => {
@@ -505,7 +509,7 @@ function App() {
           setReaderStatus(false);
         }
         if (agentMode) {
-          if (!s.paired || !agentId)
+          if (!s.paired || !(roomMode ? chosenAgents.length : agentId))
             throw Error("Choose an available ReadyCode agent.");
           preparedResearch.current = {
             prompt,
@@ -513,7 +517,7 @@ function App() {
             files: originalFiles,
             documents: originalDocuments,
           };
-          await api.research(id, agentId, prompt);
+          await api.research(id, roomMode ? chosenAgents : agentId, prompt);
           if (generation === pickGeneration.current) {
             setDocuments([]);
             readerRequest.current = null;
@@ -551,8 +555,10 @@ function App() {
     );
   const canResearch = !!(
     s?.paired &&
-    agentId &&
-    agents.some((a) => a.id === agentId) &&
+    (roomMode
+      ? chosenAgents.length &&
+        chosenAgents.every((id) => agents.some((a) => a.id === id))
+      : agents.some((a) => a.id === agentId)) &&
     !researchPending &&
     !catalogBusy
   );
@@ -1003,7 +1009,7 @@ function App() {
                                 }
                                 await api.research(
                                   id,
-                                  research.agentId,
+                                  research.agentIds ?? research.agentId,
                                   research.prompt,
                                 );
                               })
@@ -1030,6 +1036,48 @@ function App() {
                     />
                   </div>
                 )}
+                {chat &&
+                  !chat.cloudUnavailable &&
+                  [
+                    ...(chat.rounds ?? []),
+                    ...(research?.agentIds ? [research] : []),
+                  ].map((round) => (
+                    <section
+                      key={round.requestId}
+                      aria-label="Room reply status"
+                      className="research-progress"
+                    >
+                      <strong>Ask the room</strong> ·{" "}
+                      {round.prompt.slice(0, 80)}
+                      {round.participants?.map((p) => (
+                        <div key={p.agent_id}>
+                          {p.label} · {p.status}
+                          {p.error && " · " + p.error}{" "}
+                          {p.status === "failed" && round.runId && (
+                            <button
+                              disabled={working}
+                              onClick={() =>
+                                void run(async () => {
+                                  setWorking(true);
+                                  try {
+                                    await api.retryAgent(
+                                      id,
+                                      round.runId!,
+                                      p.agent_id,
+                                    );
+                                  } finally {
+                                    setWorking(false);
+                                  }
+                                })
+                              }
+                            >
+                              Retry {p.label}
+                            </button>
+                          )}
+                        </div>
+                      ))}
+                    </section>
+                  ))}
                 <div ref={bottom} />
               </div>
             </div>
@@ -1084,26 +1132,46 @@ function App() {
                       </select>
                     </label>
                     {agentMode ? (
-                      <label>
-                        Cloud agent
-                        <select
-                          aria-label="Cloud agent"
-                          disabled={!agents.length}
-                          value={agentId}
-                          onChange={(e) => setAgentId(e.target.value)}
-                        >
-                          {!agents.length && (
-                            <option value="">
-                              {catalogBusy ? "Loading…" : "Unavailable"}
-                            </option>
-                          )}
-                          {agents.map((a) => (
-                            <option key={a.id} value={a.id}>
-                              {a.name} · {a.provider}
-                            </option>
-                          ))}
-                        </select>
-                      </label>
+                      <>
+                        <label className="check">
+                          <input
+                            type="checkbox"
+                            checked={roomMode}
+                            onChange={(e) => {
+                              setRoomMode(e.target.checked);
+                              if (e.target.checked)
+                                setChosenAgents(agentId ? [agentId] : []);
+                            }}
+                          />{" "}
+                          Ask the room
+                        </label>
+                        {!roomMode && (
+                          <label>
+                            Cloud agent
+                            <select
+                              aria-label="Cloud agent"
+                              disabled={!agents.length}
+                              value={agentId}
+                              onChange={(e) => setAgentId(e.target.value)}
+                            >
+                              {!agents.length && (
+                                <option value="">
+                                  {catalogBusy ? "Loading…" : "Unavailable"}
+                                </option>
+                              )}
+                              {agents.map((a) => (
+                                <option key={a.id} value={a.id}>
+                                  {a.name
+                                    .toLowerCase()
+                                    .includes(a.provider.toLowerCase())
+                                    ? a.name
+                                    : a.name + " · " + a.provider}
+                                </option>
+                              ))}
+                            </select>
+                          </label>
+                        )}
+                      </>
                     ) : (
                       <>
                         <label>
@@ -1143,7 +1211,7 @@ function App() {
                           (!catalogBusy && !agents.length
                             ? "No ReadyCode agents are available for this account. Check your OpenRouter key in ReadyCode AI setup."
                             : "Chat through ReadyCode. Your agent can search when the question needs web sources.")}{" "}
-                      {s.paired && !catalogBusy && !agents.length && (
+                      {s.paired && !catalogBusy && (
                         <>
                           <button onClick={() => reloadCatalog((n) => n + 1)}>
                             Refresh agents
@@ -1156,6 +1224,45 @@ function App() {
                         </>
                       )}
                     </p>
+                  )}
+                  {agentMode && roomMode && agents.length > 0 && (
+                    <fieldset className="room-picker">
+                      <legend>Choose who replies</legend>
+                      {agents.map((a) => (
+                        <label key={a.id} className="check">
+                          <input
+                            type="checkbox"
+                            checked={chosenAgents.includes(a.id)}
+                            disabled={
+                              !chosenAgents.includes(a.id) &&
+                              chosenAgents.length >= 8
+                            }
+                            onChange={(e) =>
+                              setChosenAgents((ids) =>
+                                e.target.checked
+                                  ? [...ids, a.id]
+                                  : ids.filter((id) => id !== a.id),
+                              )
+                            }
+                          />
+                          {a.name}
+                        </label>
+                      ))}
+                      {agents.length <= 8 && (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setChosenAgents(agents.map((a) => a.id))
+                          }
+                        >
+                          Select all
+                        </button>
+                      )}
+                      <p className="hint">
+                        {chosenAgents.length} selected. Each reply uses your
+                        account’s provider key and has its own savings receipt.
+                      </p>
+                    </fieldset>
                   )}
                   <div className="attachment-row">
                     <input
@@ -1306,7 +1413,11 @@ function App() {
                         }
                         onClick={() => void send()}
                       >
-                        Send ↑
+                        {roomMode
+                          ? "Send to " +
+                            chosenAgents.length +
+                            (chosenAgents.length === 1 ? " agent" : " agents")
+                          : "Send ↑"}
                       </button>
                     ) : hasKey ? (
                       <button

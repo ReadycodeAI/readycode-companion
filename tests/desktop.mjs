@@ -678,6 +678,91 @@ try {
   assert.equal(requests[0].headers.Authorization, "Bearer rcd_fixture");
   assert.ok(!JSON.stringify(requests).includes("groq-only-fixture"));
   const removedId = requests[0].body.chat_id;
+  await desktop.evaluate(() => {
+    globalThis.catalog.push({
+      id: "second",
+      name: "Second agent",
+      provider: "Fixture",
+      model: "other",
+      capabilities: ["chat"],
+    });
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = async (url, opts) => {
+      if (!url.endsWith("/room_run") && !url.endsWith("/room_retry"))
+        return originalFetch(url, opts);
+      const body = JSON.parse(opts.body);
+      globalThis.calls.push({ url, body, headers: opts.headers });
+      if (url.endsWith("/room_run")) {
+        globalThis.round = {
+          request_id: body.request_id,
+          run_id: "round1",
+          room_id: "room-test",
+          user_message_id: "human-round",
+          status: "completed",
+          participants: [
+            { agent_id: "news", label: "First", status: "completed" },
+            {
+              agent_id: "second",
+              label: "Second",
+              status: "failed",
+              error: "Temporary failure",
+            },
+          ],
+        };
+        globalThis.runs.push(globalThis.round);
+        globalThis.remote.push({
+          id: "human-round",
+          label: "You",
+          role: "user",
+          content: body.prompt,
+        });
+      } else globalThis.round.participants[1].status = "completed";
+      const suffix = url.endsWith("/room_run") ? "1" : "2";
+      globalThis.remote.push({
+        id: "room-answer-" + suffix,
+        role: "assistant",
+        label: "Agent " + suffix,
+        content: "Room answer " + suffix,
+        run_id: "round1",
+        user_message_id: "human-round",
+        receipt: {
+          ...globalThis.remote.find((m) => m.receipt).receipt,
+          id: "a0000000-0000-4000-8000-00000000000" + suffix,
+        },
+      });
+      return Response.json(globalThis.round);
+    };
+  });
+  await win.getByRole("button", { name: "Refresh agents" }).click();
+  await win.getByLabel("Ask the room").check();
+  await win.getByRole("button", { name: "Send to 1 agent" }).waitFor();
+  await win.getByLabel("Second agent", { exact: true }).check();
+  await win
+    .getByLabel("Message", { exact: true })
+    .fill("Which models are here?");
+  await win.getByRole("button", { name: "Send to 2 agents" }).click();
+  await win.getByRole("button", { name: "Retry Second" }).waitFor();
+  await win.evaluate((id) => window.companion.readChat(id), removedId);
+  await win.getByText("Room answer 1", { exact: true }).waitFor();
+  await win.getByRole("button", { name: "Retry Second" }).click();
+  await win.getByText("Second · completed", { exact: false }).waitFor();
+  await win.evaluate((id) => window.companion.readChat(id), removedId);
+  await win.getByText("Room answer 2", { exact: true }).waitFor();
+  const snapshot = await win.evaluate(() => window.companion.state());
+  const roomTurns = snapshot.chats
+    .find((c) => c.id === removedId)
+    .turns.filter((t) => t.id === "human-round");
+  assert.equal(roomTurns.length, 1);
+  assert.equal(roomTurns[0].replies.length, 2);
+  assert.equal(new Set(roomTurns[0].replies.map((r) => r.receipt.id)).size, 2);
+  const roomCalls = await desktop.evaluate(() =>
+    globalThis.calls.filter(
+      (c) => c.url.endsWith("/room_run") || c.url.endsWith("/room_retry"),
+    ),
+  );
+  assert.equal(roomCalls.length, 2);
+  assert.deepEqual(roomCalls[0].body.agent_ids, ["news", "second"]);
+  assert.equal(roomCalls[1].body.agent_id, "second");
   await desktop.evaluate((_, id) => {
     globalThis.removedChat = id;
   }, removedId);

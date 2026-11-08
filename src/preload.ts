@@ -5,6 +5,7 @@ const api: Bridge = {
   stopReader: (id) => ipcRenderer.invoke("stopReader", id),
   agents: (id) => ipcRenderer.invoke("agents", id),
   research: (id, a, p) => ipcRenderer.invoke("research", id, a, p),
+  retryAgent: (id, r, a) => ipcRenderer.invoke("retryAgent", id, r, a),
   openSource: (id, m, i) => ipcRenderer.invoke("openSource", id, m, i),
   team: (id) => ipcRenderer.invoke("team", id),
   openTeam: (id, model) => ipcRenderer.invoke("openTeam", id, model),

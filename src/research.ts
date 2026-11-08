@@ -55,10 +55,30 @@ export function updateResearch(chat: Chat, run: Research, row: any) {
     (chat.roomId && chat.roomId !== row.room_id)
   )
     throw Error("Invalid ReadyCode research acknowledgement.");
+  if (run.agentIds) {
+    if (
+      !Array.isArray(row.participants) ||
+      !row.participants.length ||
+      row.participants.some(
+        (p: any) =>
+          !run.agentIds!.includes(p?.agent_id) ||
+          typeof p.label !== "string" ||
+          !["queued", "running", "completed", "failed"].includes(p.status),
+      )
+    )
+      throw Error("Invalid ReadyCode room participants.");
+    run.participants = row.participants.map((p: any) => ({
+      agent_id: p.agent_id,
+      label: p.label,
+      status: p.status,
+      error: typeof p.error === "string" ? p.error : undefined,
+    }));
+  }
   chat.roomId = row.room_id;
   run.runId = row.run_id;
   run.userId = row.user_message_id;
   if (
+    !run.agentIds &&
     (run.status === "completed" || run.status === "failed") &&
     row.status !== run.status
   )

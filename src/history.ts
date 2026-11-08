@@ -84,6 +84,16 @@ export function mergeMessages(chat: Chat, data: any) {
       continue;
     }
     if (m.role !== "assistant") throw Error("Unknown cloud message role.");
+    if (typeof m.user_message_id === "string") {
+      const parent = data.messages.find(
+        (v: any) => v.id === m.user_message_id && v.role === "user",
+      );
+      const cached = chat.turns.find((t) => t.id === m.user_message_id);
+      prompt = parent ?? {
+        id: m.user_message_id,
+        content: cached?.prompt ?? "",
+      };
+    }
     const receipt = readReceipt(m.receipt);
     const local =
       chat.turns.find((t) => t.replies.some((r) => r.remoteId === m.id)) ??
@@ -120,13 +130,12 @@ export function mergeMessages(chat: Chat, data: any) {
       r.sync = "synced";
       include(local);
     } else {
-      const t: Chat["turns"][number] = turns.find(
-        (t) => t.id === prompt?.id,
-      ) ?? {
-        id: prompt?.id ?? m.id,
-        prompt: prompt?.content ?? "",
-        replies: [],
-      };
+      const t: Chat["turns"][number] = turns.find((t) => t.id === prompt?.id) ??
+        chat.turns.find((t) => t.id === prompt?.id) ?? {
+          id: prompt?.id ?? m.id,
+          prompt: prompt?.content ?? "",
+          replies: [],
+        };
       t.replies.push({
         model: m.label,
         text: m.content,
@@ -141,6 +150,18 @@ export function mergeMessages(chat: Chat, data: any) {
       });
       include(t);
     }
+    if (typeof m.user_message_id === "string" && typeof m.run_id === "string") {
+      const reply = turns
+        .flatMap((t) => t.replies)
+        .find((r) => r.remoteId === m.id);
+      if (reply) {
+        reply.status = reply.receipt ? "complete" : "failed";
+        reply.error = reply.receipt
+          ? undefined
+          : "ReadyCode did not return a savings receipt for this reply.";
+        if (!reply.receipt) reply.text = "";
+      }
+    }
     prompt = undefined;
   }
   flush();
@@ -152,5 +173,28 @@ export function mergeMessages(chat: Chat, data: any) {
       (v: any) => v.request_id === chat.research!.requestId,
     );
     if (run) updateResearch(chat, chat.research, run);
+  }
+  for (const row of Array.isArray(data.runs) ? data.runs : []) {
+    if (
+      !Array.isArray(row.participants) ||
+      !row.participants.length ||
+      row.request_id === chat.research?.requestId
+    )
+      continue;
+    const rounds = (chat.rounds ??= []);
+    let round = rounds.find((r) => r.requestId === row.request_id);
+    if (!round) {
+      const ids = row.participants.map((p: any) => p.agent_id);
+      round = {
+        requestId: row.request_id,
+        agentId: ids[0],
+        agentIds: ids,
+        prompt:
+          chat.turns.find((t) => t.id === row.user_message_id)?.prompt ?? "",
+        status: "queued",
+      };
+      updateResearch(chat, round, row);
+      rounds.push(round);
+    } else updateResearch(chat, round, row);
   }
 }
