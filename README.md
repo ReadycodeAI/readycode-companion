@@ -2,9 +2,9 @@
 
 ReadyCode Companion is a free, MIT-licensed desktop AI companion and multi-agent harness powered by ReadyCode Cloud.
 
-**Windows x64 preview:** The unsigned 1.0.1 installer is available for testing. Read the release notes for the SHA-256 checksum and Windows installation steps. This preview uses manual updates. [Download the Windows preview](https://github.com/ReadycodeAI/readycode-companion/releases/tag/preview-windows-1.0.1)
+**Windows x64 preview:** The unsigned 1.0.2 installer is available for testing. Read the release notes for the SHA-256 checksum and Windows installation steps. This preview uses manual updates. [Download the Windows preview](https://github.com/ReadycodeAI/readycode-companion/releases/tag/preview-windows-1.0.2)
 
-The newer Coding goals pilot is available in source. [Connect a local lead or IDE](docs/coding-goals.md).
+The 1.0.2 preview includes Coding goals and setup instructions for Codex, Cursor and local model hosts. [Connect a local lead or IDE](docs/coding-goals.md).
 
 - **Free AI harness.** Pair your ReadyCode account and bring a supported provider key, or start with a GroqCloud key on its free plan. Select **Ask the room** to get separate replies from your configured cloud agents in one chat. Attach a PDF, Word document or spreadsheet to ask about cited passages with ReadyCode Reader.
 - **ReadyCode optimization.** ReadyCode keeps the full synced conversation in your account and reduces repeated context on its servers. Each new successful reply has its own savings receipt with estimated input tokens before and after compaction. Short chats can pass through whole.
