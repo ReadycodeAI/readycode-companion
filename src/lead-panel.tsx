@@ -1,6 +1,10 @@
 import React, { useEffect, useState } from "react";
 const api = window.companion;
-export function LeadPanel({panelRef}:{panelRef:React.Ref<HTMLDetailsElement>}) {
+export function LeadPanel({
+  panelRef,
+}: {
+  panelRef: React.Ref<HTMLDetailsElement>;
+}) {
   const [project, setProject] = useState(""),
     [goal, setGoal] = useState(""),
     [busy, setBusy] = useState(false),
@@ -9,6 +13,23 @@ export function LeadPanel({panelRef}:{panelRef:React.Ref<HTMLDetailsElement>}) {
     useState<Awaited<ReturnType<typeof api.leadGoal>>>();
   const [ide, setIDE] = useState<Awaited<ReturnType<typeof api.ideSetup>>>();
   const [client, setClient] = useState("Codex");
+  const [policy, setPolicy] = useState<"auto" | "solo" | "two">("auto");
+  const [hosts, setHosts] = useState<Record<string, boolean>>({});
+  useEffect(() => {
+    let live = true;
+    api
+      .detectHosts()
+      .then((found) => {
+        if (live) {
+          setHosts(found);
+          setClient(Object.keys(found).find((k) => found[k]) ?? "Codex");
+        }
+      })
+      .catch(() => {});
+    return () => {
+      live = false;
+    };
+  }, []);
   useEffect(() => api.leadProgress(setStatus), []);
   async function act(fn: () => Promise<void>) {
     setBusy(true);
@@ -24,24 +45,42 @@ export function LeadPanel({panelRef}:{panelRef:React.Ref<HTMLDetailsElement>}) {
   return (
     <details className="lead-setup" ref={panelRef}>
       <summary>Coding goals · Connect your local lead</summary>
-      {!project && (
-        <p>
-          Select your IDE or local model host. Setup will ask for the Git folder you want it to work on.
-        </p>
-      )}
-      <label>IDE or model host{" "}
-        <select aria-label="IDE setup" value={client} onChange={e=>setClient(e.target.value)}>
-          <option>Codex</option><option>Cursor</option><option>Local model host</option>
+      <p>
+        Connect your IDE first. When it shares its open Git project, Companion
+        shows the path for you to confirm.
+      </p>
+      <label>
+        IDE or model host{" "}
+        <select
+          aria-label="IDE setup"
+          value={client}
+          onChange={(e) => setClient(e.target.value)}
+        >
+          {["Codex", "Cursor", "Local model host"].map((c) => (
+            <option key={c} value={c}>
+              {c}
+              {hosts[c] ? " · detected" : ""}
+            </option>
+          ))}
         </select>
       </label>
-      {!ide && <button disabled={busy} onClick={()=>act(async()=>{
-        if(!project){
-          const p=await api.connectProject();
-          if(!p)return;
-          setProject(p);
+      <button
+        disabled={busy}
+        onClick={() =>
+          act(async () => {
+            setIDE(await api.ideSetup());
+            if (client === "Codex") {
+              await api.registerCodex();
+              setStatus("Registered. Start a new Codex chat in your project.");
+            } else if (client === "Cursor") {
+              await api.registerCursor();
+              setStatus("Confirm installation in Cursor.");
+            } else setStatus("Add the server below in your local model host.");
+          })
         }
-        setIDE(await api.ideSetup());
-      })}>Set up {client} connection</button>}
+      >
+        Connect {client}
+      </button>
       <button
         disabled={busy}
         onClick={() =>
@@ -55,9 +94,9 @@ export function LeadPanel({panelRef}:{panelRef:React.Ref<HTMLDetailsElement>}) {
           })
         }
       >
-        Choose project folder
+        Choose project manually
       </button>
-      {project && (
+      {(project || ide) && (
         <>
           <p>{project}</p>
           <label>
@@ -84,8 +123,9 @@ export function LeadPanel({panelRef}:{panelRef:React.Ref<HTMLDetailsElement>}) {
               {client === "Codex" ? (
                 <>
                   <p>
-                    2. Sign in to the Codex CLI, then register Companion using
-                    the button. You can also run the command below yourself.
+                    If automatic registration failed, sign in to the Codex CLI
+                    and retry using the button. You can also run the command
+                    below yourself.
                   </p>
                   <button
                     disabled={busy}
@@ -131,19 +171,19 @@ export function LeadPanel({panelRef}:{panelRef:React.Ref<HTMLDetailsElement>}) {
                 </>
               )}
               <p>
-                3. Start a new {client} chat. Send the prompt below and approve
-                the project tool if asked. The returned path should match the
-                folder above.
+                Start a new {client} chat, send this prompt and confirm the
+                proposed project in Companion.
               </p>
               <pre style={{ whiteSpace: "pre-wrap" }}>
-                Use readycode-companion’s project tool and show me the connected
-                folder and any recent coding goals. Read the roadmap before
-                starting new work.
+                Call the readycode-companion project tool with workspace set to
+                my current Git checkout. Show recent goals and read the roadmap
+                before starting new work.
               </pre>
               <button
                 onClick={() =>
                   act(async () => {
                     const state = await api.ideStatus();
+                    setProject(await api.ideProject());
                     setStatus(
                       state === "waiting"
                         ? "Waiting for the IDE to call the project tool. Check the server is enabled, Node is on PATH, and the tool call is approved."
@@ -165,8 +205,8 @@ export function LeadPanel({panelRef}:{panelRef:React.Ref<HTMLDetailsElement>}) {
                 and show me the diff before committing.
               </pre>
               <p>
-                Keep Companion open. After restarting it, choose the folder and
-                enable IDE access again. The IDE registration can be reused.
+                Keep Companion open. After restarting it, reconnect your host
+                here.
               </p>
               <button
                 onClick={() =>
@@ -181,16 +221,28 @@ export function LeadPanel({panelRef}:{panelRef:React.Ref<HTMLDetailsElement>}) {
             </div>
           )}
           <button
-            disabled={busy || !goal.trim()}
+            disabled={busy || !project || !goal.trim()}
             onClick={() =>
               act(async () => {
                 setResult(undefined);
-                setResult(await api.leadGoal(goal));
+                setResult(await api.leadGoal(goal, policy));
               })
             }
           >
-            Run goal with two agents
+            Run coding goal
           </button>
+          <label>
+            {" "}
+            Cloud help{" "}
+            <select
+              value={policy}
+              onChange={(e) => setPolicy(e.target.value as typeof policy)}
+            >
+              <option value="auto">Local first · escalate if needed</option>
+              <option value="solo">Lead only</option>
+              <option value="two">Require two specialists</option>
+            </select>
+          </label>
         </>
       )}
       <p role="status">{status}</p>

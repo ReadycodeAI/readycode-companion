@@ -149,10 +149,13 @@ export type ReaderRequest = {
 export interface Bridge {
   ideSetup:()=>Promise<{script:string;descriptor:string}>;
   registerCodex:()=>Promise<void>;
+  registerCursor:()=>Promise<void>;
+  detectHosts:()=>Promise<Record<string,boolean>>;
+  ideProject:()=>Promise<string>;
   ideStatus:()=>Promise<string>;
   disconnectIDE:()=>Promise<void>;
   connectProject: () => Promise<string>;
-  leadGoal: (goal:string) => Promise<{report:string;diff:string;branch:string;room:string}>;
+  leadGoal: (goal:string,policy?:"auto"|"solo"|"two") => Promise<{report:string;diff:string;branch:string;room:string}>;
   saveLead: () => Promise<string>;
   leadProgress: (fn:(s:string)=>void) => () => void;
   checkUpdate(): Promise<void>;

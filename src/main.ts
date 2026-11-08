@@ -5,6 +5,7 @@ import {execFile} from "node:child_process";
 import {promisify} from "node:util";
 import {tmpdir} from "node:os";
 import {openBridge} from "./ide-bridge";
+import {codexPath, detectHosts} from "./detect-hosts";
 import { startUpdates, checkUpdates, installUpdate, updateMessage, updateReady } from "./updates";
 import type { ReaderRequest } from "./types";
 import { researchAgents, sourceList, updateResearch } from "./research";
@@ -17,7 +18,7 @@ import {
   shell,
   session,
 } from "electron";
-import { join } from "node:path";
+import { join, isAbsolute } from "node:path";
 import { pathToFileURL } from "node:url";
 import { randomUUID } from "node:crypto";
 import { hostname } from "node:os";
@@ -425,15 +426,28 @@ function handlers() {
   let closeBridge:(()=>Promise<void>)|undefined;
   let checkedAt="";
   bind("ideStatus",()=>closeBridge && token===leadOwner ? checkedAt || "waiting" : "disabled");
-  const disconnectBridge=async()=>{await closeBridge?.();closeBridge=undefined};
+  let generation=0;
+  const disconnectBridge=async()=>{generation++;await closeBridge?.();closeBridge=undefined};
+  bind("detectHosts",detectHosts);
+  bind("ideProject",()=>project&&token===leadOwner?project.root+" · "+project.base.slice(0,8):"");
   const bridgePaths=()=>({script:app.isPackaged?join(process.resourcesPath,"ide-mcp.cjs"):join(app.getAppPath(),"scripts","ide-mcp.cjs"),
     descriptor:join(app.getPath("userData"),"ide-session.json")});
   bind("ideSetup",async()=>{
-    if(!project||!token||token!==leadOwner)throw Error("Choose a project first.");
+    if(!token||leadBusy)throw Error("Pair your account and wait for the local lead to finish.");
     await disconnectBridge();
+    if(leadOwner!==token){project=undefined;candidate=undefined;}
+    leadOwner=token;
+    const session=generation, account=token;
     const {descriptor,script}=bridgePaths();
     checkedAt="";
-    closeBridge=await openBridge(descriptor,project.root,()=>token,()=>{checkedAt=new Date().toISOString()});
+    closeBridge=await openBridge(descriptor,project?.root??"",()=>token,()=>{checkedAt=new Date().toISOString()},async(path)=>{
+      if(!window||!isAbsolute(path)||/^(\\\\|\/\/)/.test(path)||path.length>4000)throw Error("Supply an absolute local Git workspace path.");
+      const p=await connectLead(path);
+      const choice=await dialog.showMessageBox(window,{type:"question",title:"Connect this project?",message:"Use this Git project for ReadyCode coding goals?",detail:p.root+" · "+p.base.slice(0,8),buttons:["Connect project","Cancel"],defaultId:1,cancelId:1});
+      if(choice.response!==0||account!==token||generation!==session)throw Error("Project was not connected.");
+      project=p;candidate=undefined;
+      return p.root;
+    });
     return {script,descriptor};
   });
   bind("registerCodex",async()=>{
@@ -441,7 +455,15 @@ function handlers() {
     const {script,descriptor}=bridgePaths();
     const run=promisify(execFile);
     await run("node",["--version"],{cwd:tmpdir(),windowsHide:true,timeout:10000});
-    await run(process.platform==="win32"?"codex.exe":"codex",["mcp","add","readycode-companion","--","node",script,descriptor],{cwd:tmpdir(),windowsHide:true,timeout:20000});
+    const cli=await codexPath();
+    if(!cli)throw Error("Install the Codex CLI, then retry.");
+    await run(cli,["mcp","add","readycode-companion","--","node",script,descriptor],{cwd:tmpdir(),windowsHide:true,timeout:20000});
+  });
+  bind("registerCursor",async()=>{
+    if(!closeBridge||!token||leadOwner!==token)throw Error("Enable the IDE connection first.");
+    const {script,descriptor}=bridgePaths();
+    const config=Buffer.from(JSON.stringify({command:"node",args:[script,descriptor]})).toString("base64");
+    await shell.openExternal("cursor://anysphere.cursor-deeplink/mcp/install?name=readycode-companion&config="+encodeURIComponent(config));
   });
   bind("disconnectIDE",disconnectBridge);
   bind("connectProject",async()=>{
@@ -454,11 +476,11 @@ function handlers() {
     candidate=undefined;
     return project.root+" · "+project.base.slice(0,8);
   });
-  bind("leadGoal",async(goal:string)=>{
-    if(!project||!token||token!==leadOwner||leadBusy||typeof goal!=="string"||!goal.trim()||goal.length>4000) throw Error("Connect a project and enter one goal.");
+  bind("leadGoal",async(goal:string,policy:"auto"|"solo"|"two"="auto")=>{
+    if(!project||!token||token!==leadOwner||leadBusy||typeof goal!=="string"||!goal.trim()||goal.length>4000||!["auto","solo","two"].includes(policy)) throw Error("Connect a project and enter one goal.");
     leadBusy=true;candidate=undefined;
     try {
-      candidate=await runLead(project,goal.trim(),join(app.getPath("userData"),"goal-worktrees"),()=>token,s=>window?.webContents.send("leadProgress",s));
+      candidate=await runLead(project,goal.trim(),join(app.getPath("userData"),"goal-worktrees"),()=>token,s=>window?.webContents.send("leadProgress",s),policy);
       const {report,diff,branch,room}=candidate;
       return {report,diff,branch,room};
     } finally {leadBusy=false}

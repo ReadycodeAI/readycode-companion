@@ -12,6 +12,7 @@ import {
 import { writeFile, rm } from "node:fs/promises";
 import { cloud } from "./network";
 import { researchAgents } from "./research";
+import { dispatch, projectHints } from "./dispatcher";
 
 /** Only the local stdio adapter reads the random session secret. No provider or device keys are exported. */
 export async function openBridge(
@@ -19,17 +20,22 @@ export async function openBridge(
   root: string,
   owner: () => string,
   onProjectRead: () => void = () => {},
+  approveWorkspace?: (path: string) => Promise<string>,
 ) {
   const account = owner(),
     key = randomBytes(32).toString("hex");
-  const folder = join(
-    dirname(file),
-    "ide-goals",
-    createHash("sha256")
-      .update(JSON.stringify([account, root]))
-      .digest("hex"),
-  );
-  mkdirSync(folder, { recursive: true });
+  const storage = () =>
+    join(
+      dirname(file),
+      "ide-goals",
+      createHash("sha256")
+        .update(JSON.stringify([account, root]))
+        .digest("hex"),
+    );
+  let folder = root ? storage() : "";
+  let binding = false,
+    closed = false;
+  if (folder) mkdirSync(folder, { recursive: true });
   type Goal = {
     goal: string;
     roadmap?: string;
@@ -77,6 +83,32 @@ export async function openBridge(
       );
       if (name === "project") {
         onProjectRead();
+        if (!root) {
+          if (
+            !approveWorkspace ||
+            typeof a.workspace !== "string" ||
+            !a.workspace
+          ) {
+            reply(200, {
+              connected: true,
+              root: null,
+              next: "Call project again with workspace set to the absolute path of your current Git checkout.",
+            });
+            return;
+          }
+          if (binding) throw Error("Workspace approval is already open.");
+          binding = true;
+          try {
+            const confirmed = await approveWorkspace(a.workspace);
+            if (closed || owner() !== account)
+              throw Error("IDE connection expired.");
+            root = confirmed;
+            folder = storage();
+            mkdirSync(folder, { recursive: true });
+          } finally {
+            binding = false;
+          }
+        }
         const recent = readdirSync(folder)
           .filter((n) => uuid(n.slice(0, -5)) && n.endsWith(".json"))
           .map((n) => ({
@@ -94,6 +126,10 @@ export async function openBridge(
         });
         return;
       }
+      if (!root)
+        throw Error(
+          "Call project with your current workspace and approve it in Companion.",
+        );
       if (name === "start_goal") {
         if (
           typeof a.goal !== "string" ||
@@ -107,6 +143,23 @@ export async function openBridge(
         return;
       }
       const state = read(a.chat_id);
+      if (name === "dispatch") {
+        if (
+          a.blocker !== undefined &&
+          (typeof a.blocker !== "string" || a.blocker.length > 1500)
+        )
+          throw Error("Describe the observed blocker briefly.");
+        reply(200, {
+          ...dispatch(
+            state.goal,
+            a.blocker ?? "",
+            Object.keys(state.handoffs).length,
+          ),
+          paths: await projectHints(root, state.goal),
+          roadmap: state.roadmap ?? "",
+        });
+        return;
+      }
       if (name === "roadmap") {
         if (a.plan !== undefined) {
           if (
@@ -234,6 +287,7 @@ export async function openBridge(
     throw e;
   }
   return async () => {
+    closed = true;
     server.closeAllConnections();
     server.close();
     await rm(file, { force: true });

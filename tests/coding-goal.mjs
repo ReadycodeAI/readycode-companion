@@ -103,17 +103,20 @@ try {
     job.prompt,
     "Coding goal: Remember my default AI\nAssignment: Design a restart test",
   );
-  await app.evaluate(({ dialog }, path) => {
-    dialog.showOpenDialog = async () => ({
-      canceled: false,
-      filePaths: [path],
+  await app.evaluate(({ dialog }) => {
+    dialog.showOpenDialog = async () => {
+      throw Error("Connecting an IDE must not open a folder picker.");
+    };
+    globalThis.approvals = 0;
+    dialog.showMessageBox = async () => ({
+      response: ++globalThis.approvals === 1 ? 1 : 0,
     });
-  }, process.cwd());
-  await page.getByRole("button",{name:"IDE & MCP setup"}).click();
-  await page.getByLabel("IDE setup",{exact:true}).waitFor();
-  await page
-    .getByRole("button", { name: "Set up Codex connection" })
-    .click();
+  });
+  await page.getByRole("button", { name: "IDE & MCP setup" }).click();
+  await page.getByLabel("IDE setup", { exact: true }).waitFor();
+  await page.getByLabel("IDE setup").selectOption("Local model host");
+  await page.getByRole("button", { name: "Connect Local model host" }).click();
+  await page.getByLabel("IDE setup").selectOption("Codex");
   await page.getByRole("button", { name: "Register in Codex" }).waitFor();
   await page.getByLabel("IDE setup", { exact: true }).selectOption("Cursor");
   await page.getByText(/Open Cursor Settings/).waitFor();
@@ -153,13 +156,45 @@ try {
       (await rpc("initialize", { protocolVersion: "2025-06-18" })).capabilities
         .tools,
     );
+    assert.equal((await tool("project", {})).root, null);
+    assert.ok(
+      (
+        await rpc("tools/call", {
+          name: "project",
+          arguments: { workspace: process.cwd() },
+        })
+      ).isError,
+    );
+    assert.ok(
+      (
+        await rpc("tools/call", {
+          name: "start_goal",
+          arguments: { goal: "Unapproved" },
+        })
+      ).isError,
+    );
     assert.equal(
-      (await tool("project", {})).root.replaceAll("\\", "/"),
+      (await tool("project", { workspace: process.cwd() })).root.replaceAll(
+        "\\",
+        "/",
+      ),
       process.cwd().replaceAll("\\", "/"),
     );
     await page.getByRole("button", { name: "Check IDE connection" }).click();
     await page.getByText(/Project tool reached Companion/).waitFor();
     const { chat_id } = await tool("start_goal", { goal: "Remember default" });
+    const route = await tool("dispatch", { chat_id });
+    assert.equal(route.route, "lead");
+    assert.ok(route.paths.tracked > 0);
+    assert.equal(
+      (
+        await tool("dispatch", {
+          chat_id,
+          blocker: "restart regression test failed",
+        })
+      ).route,
+      "one_specialist",
+    );
     await tool("roadmap", {
       chat_id,
       plan: "Verify the second selection after restart",

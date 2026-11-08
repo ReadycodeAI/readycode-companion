@@ -4,9 +4,12 @@ const api: Bridge = {
   ideSetup:()=>ipcRenderer.invoke("ideSetup"),
   ideStatus:()=>ipcRenderer.invoke("ideStatus"),
   registerCodex:()=>ipcRenderer.invoke("registerCodex"),
+  registerCursor:()=>ipcRenderer.invoke("registerCursor"),
+  detectHosts:()=>ipcRenderer.invoke("detectHosts"),
+  ideProject:()=>ipcRenderer.invoke("ideProject"),
   disconnectIDE:()=>ipcRenderer.invoke("disconnectIDE"),
   connectProject: () => ipcRenderer.invoke("connectProject"),
-  leadGoal: goal => ipcRenderer.invoke("leadGoal",goal),
+  leadGoal: (goal,policy) => ipcRenderer.invoke("leadGoal",goal,policy),
   saveLead: () => ipcRenderer.invoke("saveLead"),
   leadProgress: fn => {
     const cb=(_:unknown,s:string)=>fn(s);
