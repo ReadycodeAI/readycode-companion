@@ -77,6 +77,8 @@ export function updateResearch(chat: Chat, run: Research, row: any) {
   chat.roomId = row.room_id;
   run.runId = row.run_id;
   run.userId = row.user_message_id;
+  const turn = chat.turns.find(t => t.id === run.userId);
+  if (turn && run.documentReceipt) turn.documentReceipt = run.documentReceipt;
   if (
     !run.agentIds &&
     (run.status === "completed" || run.status === "failed") &&

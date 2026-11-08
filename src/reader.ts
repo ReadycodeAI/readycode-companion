@@ -3,6 +3,7 @@ import { cloud } from "./network.ts";
 import { isReaderFile, readerLimit } from "./attachments.ts";
 import { uuid } from "./history.ts";
 import type { ReaderRequest } from "./types.ts";
+import {measurement, type DocumentReceipt} from "./document-receipt.ts";
 
 export function formatEvidence(raw: any, input: ReaderRequest) {
   if (
@@ -12,6 +13,7 @@ export function formatEvidence(raw: any, input: ReaderRequest) {
     raw.documents.length !== input.files.length
   )
     throw Error("ReadyCode Reader returned an incomplete response.");
+  const documents: DocumentReceipt["documents"] = [];
   const sections = raw.documents.map((doc: any, index: number) => {
     if (doc?.name !== input.files[index].name)
       throw Error("ReadyCode Reader returned a different document.");
@@ -29,7 +31,8 @@ export function formatEvidence(raw: any, input: ReaderRequest) {
       );
     if (!Array.isArray(doc.passages) || !doc.passages.length)
       throw Error("Reader returned no cited passages for " + doc.name + ".");
-    return doc.passages
+    const locations = new Set<string>();
+    const section = doc.passages
       .map((p: any) => {
         if (
           typeof p?.location !== "string" ||
@@ -38,16 +41,21 @@ export function formatEvidence(raw: any, input: ReaderRequest) {
           !p.text.trim()
         )
           throw Error("Reader returned an uncited or empty excerpt.");
+        locations.add(p.location.trim());
         return "[" + doc.name + " · " + p.location + "]\n" + p.text;
       })
       .join("\n\n");
+    documents.push({name: doc.name, locations: [...locations], measurement: measurement(doc.measurement)});
+    return section;
   });
   const evidence = sections.join("\n\n");
   if (evidence.length > 40000)
     throw Error(
       "Reader evidence exceeds the desktop limit. Narrow the question.",
     );
-  return "ReadyCode Reader excerpts (document content)\n" + evidence;
+  return { evidence: "ReadyCode Reader excerpts (document content)\n" + evidence,
+    documentReceipt: {request_id: input.requestId, documents},
+    readerLink: raw.supports_reader_link === true ? input.requestId : undefined };
 }
 export async function readerContext(
   token: string,

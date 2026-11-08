@@ -1,5 +1,6 @@
 import { readReceipt } from "./network.ts";
 import { sourceList, updateResearch } from "./research.ts";
+import { readDocumentReceipt } from "./document-receipt.ts";
 import type { Chat, Message } from "./types.ts";
 export const uuid = /^[a-f\d]{8}-(?:[a-f\d]{4}-){3}[a-f\d]{12}$/i;
 export function context(chat: Chat): Message[] {
@@ -50,8 +51,13 @@ export function mergeMessages(chat: Chat, data: any) {
     throw Error("Invalid ReadyCode messages.");
   const turns: Chat["turns"] = [],
     used = new Set();
-  let prompt: { id: string; content: string } | undefined;
+  let prompt: { id: string; content: string; document_receipt?: unknown } | undefined;
   function include(t: Chat["turns"][number]) {
+    if (prompt) {
+      const receipt = readDocumentReceipt(prompt.document_receipt) ??
+        [chat.research, ...(chat.rounds ?? [])].find(run => run?.userId === prompt!.id)?.documentReceipt;
+      if (receipt) t.documentReceipt = receipt;
+    }
     if (!turns.includes(t)) turns.push(t);
   }
   function flush() {

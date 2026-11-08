@@ -112,8 +112,10 @@ try {
         globalThis.readerReply = {
           request_id: form.get("request_id"),
           status: "ready",
+          supports_reader_link: true,
           documents: names.map((name) => ({
             name,
+            measurement: name.endsWith(".pdf") ? {method:"exact", tokenizer:"fixture", full_text_tokens:300, excerpt_tokens:40} : undefined,
             verdict: globalThis.noEvidence
               ? "not_in_document"
               : name.endsWith(".xlsx")
@@ -419,6 +421,11 @@ try {
     ),
   );
   const readerAttempts = ready.filter((c) => c.url.endsWith("/reader_context"));
+  assert.equal(ready.find(c => c.url.endsWith("/sync")).body.reader_request_id, readerAttempts.at(-1).body.request_id);
+  const readerReceipt = win.getByRole("region",{name:"Reader document receipt"}).first();
+  await readerReceipt.getByText("brief.pdf · page 2",{exact:true}).waitFor();
+  await readerReceipt.getByText("260 document input tokens saved · fixture").waitFor();
+  await readerReceipt.getByText("Document token savings weren’t measured for this file.").first().waitFor();
   assert.equal(readerAttempts.length, 2);
   assert.notEqual(
     readerAttempts[0].body.request_id,
@@ -677,6 +684,8 @@ try {
   );
   assert.equal(requests.length, 2, JSON.stringify(requests.map((r) => r.body)));
   assert.deepEqual(requests[0].body, requests[1].body);
+  assert.ok(requests[0].body.reader_request_id);
+  await win.getByRole("region",{name:"Reader document receipt"}).getByText("budget.xlsx · Budget!B2:B7",{exact:true}).waitFor();
   assert.ok(requests[0].body.prompt.includes("research-file-marker"));
   assert.ok(requests[0].body.prompt.includes("[budget.xlsx · Budget!B2:B7]"));
   assert.ok(!requests[0].body.prompt.includes("original-binary-marker"));

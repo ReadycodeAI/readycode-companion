@@ -214,6 +214,21 @@ function Savings({ receipt: r }: { receipt?: Receipt }) {
     </div>
   );
 }
+function ReaderSavings({receipt}: {receipt: NonNullable<Turn["documentReceipt"]>}) {
+  return <section className="savings-receipt" aria-label="Reader document receipt">
+    <strong>ReadyCode Reader · document input</strong>
+    {receipt.documents.map((doc, index) => {
+      const count = doc.measurement;
+      return <div key={index}>
+        <p>{doc.name} · {doc.locations.join(", ")}</p>
+        {count ? <>
+          <p>{count.full_text_tokens.toLocaleString()} tokens in extracted text → {count.excerpt_tokens.toLocaleString()} in cited excerpts</p>
+          <p>{Math.max(0, count.full_text_tokens - count.excerpt_tokens).toLocaleString()} document input tokens saved · {count.tokenizer}</p>
+        </> : <p>Document token savings weren’t measured for this file.</p>}
+      </div>;
+    })}
+  </section>;
+}
 function Messages({
   turn,
   secondOpinion,
@@ -235,6 +250,7 @@ function Messages({
           <p className="prompt">{turn.prompt}</p>
         </>
       )}
+      {turn.documentReceipt && <ReaderSavings receipt={turn.documentReceipt}/>}
       <div className={"answers " + (turn.replies.length === 2 ? "pair" : "")}>
         {turn.replies.map((r) => (
           <section className="answer" key={r.remoteId || r.model}>
@@ -278,12 +294,12 @@ function Messages({
               </p>
             )}
             {(r.status === "complete" || !!r.text) && (
-              <Savings
+              <>{turn.documentReceipt && <strong>Chat compaction</strong>}<Savings
                 receipt={
                   r.receipt ||
                   (turn.replies.length === 1 ? turn.receipt : undefined)
                 }
-              />
+              /></>
             )}
             {r.usage && (
               <details>
@@ -547,6 +563,7 @@ function App() {
     setDraft("");
     await run(async () => {
       try {
+        let readerId: string | undefined;
         if (originalDocuments.length) {
           let job = readerRequest.current;
           if (
@@ -599,6 +616,7 @@ function App() {
           )
             throw Error("Document reading stopped.");
           prompt = attachmentPrompt(prompt + "\n\n" + evidence, []);
+          readerId = job.id;
           activeReader.current = null;
           setReaderStatus(false);
         }
@@ -611,7 +629,7 @@ function App() {
             files: originalFiles,
             documents: originalDocuments,
           };
-          await api.research(id, roomMode ? chosenAgents : agentId, prompt);
+          await api.research(id, roomMode ? chosenAgents : agentId, prompt, readerId);
           if (generation === pickGeneration.current) {
             setDocuments([]);
             readerRequest.current = null;
@@ -622,6 +640,7 @@ function App() {
           id,
           provider: p,
           models: compare ? [model, second] : [model],
+          readerId,
           prompt,
         });
         if (generation === pickGeneration.current) {

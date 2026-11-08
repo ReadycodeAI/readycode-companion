@@ -370,7 +370,17 @@ test("Reader requires sourced evidence for every selected file and a matching re
       },
     ],
   };
-  assert.match(formatEvidence(result, input), /Budget!C2:C9/);
+  const measured = {method: "exact", tokenizer: "example-tokenizer", full_text_tokens: 840, excerpt_tokens: 30};
+  result.documents[0].measurement = measured;
+  result.documents[0].passages.push({location: "page 4", text: "More evidence"});
+  const output = formatEvidence(result, input);
+  assert.match(output.evidence, /Budget!C2:C9/);
+  assert.deepEqual(output.documentReceipt.documents[0], {name:"file.pdf",locations:["page 4"],measurement:measured});
+  assert.equal(output.documentReceipt.documents[1].measurement, undefined);
+  for (const invalid of [{method:"estimate"}, {full_text_tokens:-1}, {excerpt_tokens:1.5}, {tokenizer:""}]) {
+    result.documents[0].measurement = {...measured,...invalid};
+    assert.equal(formatEvidence(result,input).documentReceipt.documents[0].measurement, undefined);
+  }
   for (const verdict of ["unchecked", "no_matching_text", "not_in_document"]) {
     assert.throws(
       () =>
@@ -404,4 +414,17 @@ test("Reader rejects unpaired and oversized uploads without any network call", a
   };
   await assert.rejects(readerContext("", input, signal), /Pair ReadyCode/);
   await assert.rejects(readerContext("fixture", input, signal), /8 MiB/);
+});
+
+test("synced Reader metadata belongs to its user turn even when prompts repeat", () => {
+  const chat = {id:"chat",title:"docs",turns:[]};
+  const receipt = { request_id:"job", documents:[{name:"brief.pdf",locations:["PDF page 4","PDF page 4"],
+    measurement:{method:"estimate",full_text_tokens:200,excerpt_tokens:5,tokenizer:"guess"}}]};
+  const messages = [{role:"user",id:"one",label:"You",content:"Question"},
+    {role:"user",id:"two",label:"You",content:"Question",document_receipt:receipt}];
+  mergeMessages(chat,{messages});
+  mergeMessages(chat,{messages});
+  assert.equal(chat.turns.length,2);
+  assert.equal(chat.turns[0].documentReceipt,undefined);
+  assert.deepEqual(chat.turns[1].documentReceipt.documents[0],{name:"brief.pdf",locations:["PDF page 4"],measurement:undefined});
 });

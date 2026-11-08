@@ -1,3 +1,4 @@
+import type { DocumentReceipt } from "./document-receipt.ts";
 export const presets = {
   OpenRouter: [
     "openai/gpt-4o",
@@ -49,6 +50,8 @@ export type Agent = {
 };
 export type Source = { title: string; url: string };
 export type Research = {
+  documentReceipt?: DocumentReceipt;
+  readerLink?: string;
   requestId: string;
   agentId: string;
   agentIds?: string[];
@@ -86,6 +89,8 @@ export type Reply = {
   sync?: "queued" | "synced";
 };
 export type Turn = {
+  documentReceipt?: DocumentReceipt;
+  readerLink?: string;
   sourceRole?: "system";
   id: string;
   prompt: string;
@@ -128,6 +133,7 @@ export type State = {
   historyEnabled: boolean;
 };
 export type Send = {
+  readerId?: string;
   id: string;
   prompt: string;
   provider: Provider;
@@ -146,7 +152,7 @@ export interface Bridge {
   readDocuments(input: ReaderRequest): Promise<string>;
   stopReader(id: string): Promise<void>;
   agents(id: string): Promise<Agent[]>;
-  research(id: string, agent: string | string[], prompt: string): Promise<void>;
+  research(id: string, agent: string | string[], prompt: string, readerId?: string): Promise<void>;
   retryAgent(id: string, run: string, agent: string): Promise<void>;
   openSource(id: string, messageId: string, index: number): Promise<void>;
   state(): Promise<State>;

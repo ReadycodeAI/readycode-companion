@@ -24,6 +24,8 @@ Click **×** beside a chat and choose **Remove from this device** to keep the sy
 
 Choose **Attach files**, select the documents, and ask a specific question. PDF, DOCX and XLSX go to ReadyCode Reader. It checks excerpts before sending them to the selected agent. Passage checking requires an OpenRouter key in your ReadyCode account. If Reader cannot verify a passage, the turn stops. For a scanned PDF, use a searchable copy. For supported plain-text attachments, the full text becomes part of the message and synced history.
 
+In desktop version 1.0.1, a document turn lists the filenames and cited locations that Reader selected, once for the whole turn. Reader compares the extracted text with the cited excerpts only when the cloud returns exact counts from the same tokenizer. Otherwise the receipt says the savings were not measured. These are document-input counts before chat compaction. They exclude Reader’s verification work and do not measure billing. Each agent’s own chat-compaction receipt appears separately. Earlier desktop versions show the excerpts in the prompt.
+
 ## Updates and cost
 
 Official signed Windows releases check for updates automatically. You can also check in **Settings**. Finish your current turn, then choose **Restart to update**. The unsigned test installer uses manual updates. Pairing may be required again if a device is revoked or its profile changes.

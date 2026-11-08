@@ -64,6 +64,14 @@ let active: AbortController | null = null,
   reading = false,
   pairing = false,
   verified = false;
+let preparedReader: (Awaited<ReturnType<typeof readerContext>> & {chatId: string}) | undefined;
+function readerFields(readerId: string | undefined, id: string, prompt: string) {
+  if (!readerId) return {};
+  const item = preparedReader;
+  if (!item || item.chatId !== id || item.documentReceipt.request_id !== readerId ||
+      !prompt.endsWith(item.evidence.trimEnd())) throw Error("Reattach the document to refresh its Reader evidence.");
+  return { documentReceipt: item.documentReceipt, readerLink: item.readerLink };
+}
 const submitting = new Set<string>();
 const deleting = new Set<string>();
 let removedIds = new Set<string>();
@@ -127,6 +135,7 @@ function idle() {
     throw Error("Wait for the current request to finish.");
 }
 function restore(value: string, snapshot = loadChats(value)) {
+  preparedReader = undefined;
   const next = snapshot.chats;
   removedIds = new Set(snapshot.removedIds);
   for (const chat of next)
@@ -221,6 +230,7 @@ async function sync() {
                 chat_id: chat.id,
                 title: chat.title,
                 receipt_id: r.receipt.id,
+                ...(turn.readerLink && {reader_request_id: turn.readerLink}),
                 user_message: turn.prompt,
                 assistant_reply: r.text,
                 model: r.model,
@@ -297,6 +307,7 @@ async function send(input: Send) {
   }
   const messages = context(chat);
   const turn: Turn = {
+    ...readerFields(input.readerId, input.id, input.prompt),
     id: randomUUID(),
     prompt: input.prompt,
     replies: input.models.map((model) => ({
@@ -468,7 +479,8 @@ function handlers() {
         AbortSignal.any([controller.signal, deadline]),
       );
       if (token !== owner) throw Error("Device changed. Please retry.");
-      return evidence;
+      preparedReader = {...evidence, chatId: input.chatId};
+      return evidence.evidence;
     } catch (e) {
       cloudFailure(e, owner);
       if (controller.signal.aborted) throw Error("Document reading stopped.");
@@ -515,7 +527,7 @@ function handlers() {
   });
   bind(
     "research",
-    async (id: string, selection: string | string[], prompt: string) => {
+    async (id: string, selection: string | string[], prompt: string, readerId?: string) => {
       requireAvailableChat(id);
       const owner = token;
       if (!owner) throw Error("Pair ReadyCode to use cloud agents.");
@@ -566,6 +578,7 @@ function handlers() {
           ? previous
           : {
               requestId: randomUUID(),
+              ...readerFields(readerId, id, prompt),
               agentId,
               agentIds: Array.isArray(selection) ? agents : undefined,
               prompt,
@@ -588,6 +601,7 @@ function handlers() {
           {
             chat_id: id,
             request_id: run.requestId,
+            ...(run.readerLink && {reader_request_id: run.readerLink}),
             ...(run.agentIds
               ? { agent_ids: run.agentIds }
               : { agent_id: agentId }),
