@@ -12,6 +12,7 @@ import {
   compact,
   stream,
   cloud,
+  readReceipt,
   pairCode,
   DeviceRevoked,
 } from "../src/network.ts";
@@ -31,6 +32,26 @@ const receipt = {
   receipt_hash: "sample",
 };
 const response = (data) => new Response(JSON.stringify(data));
+test("both cloud agent modes request automatic room recall without appending guessed history or changing the prompt", async t => {
+  const sent = [];
+  t.mock.method(globalThis, "fetch", async (_, init) => {
+    sent.push(JSON.parse(init.body));
+    return response({});
+  });
+  for (const [route, selection] of [["research_run",{agent_id:"agent"}],["room_run",{agent_ids:["a","b"]}]]) {
+    const body = { chat_id:"room", request_id:"retry-id", prompt:"What decision did I correct?", reader_request_id:"document", ...selection };
+    await cloud(route, "device", body);
+    assert.deepEqual(sent.at(-1), {...body, history_recall:"auto"});
+  }
+  await cloud("messages", "device", {chat_id:"room"});
+  assert.deepEqual(sent.at(-1), {chat_id:"room"});
+});
+test("only explicit cloud receipt evidence confirms historical retrieval", () => {
+  for (const [detail, expected] of [[undefined, undefined], [{synced:false,fetched:false}, undefined],
+    [{synced:"false"}, undefined], [{fetched:true}, "fetch"], [{fetched:true,synced:true}, "sync"]]) {
+    assert.equal(readReceipt({...receipt, detail}).historyRecall, expected);
+  }
+});
 function fixture(t, fn) {
   t.mock.method(globalThis, "fetch", fn);
 }

@@ -776,6 +776,11 @@ try {
   );
   assert.equal(roomCalls.length, 2);
   assert.deepEqual(roomCalls[0].body.agent_ids, ["news", "second"]);
+  assert.equal(roomCalls[0].body.history_recall, "auto");
+  await win.getByText("Find an earlier message", { exact: true }).click();
+  await win.getByLabel("Search your messages loaded in this chat").fill("Which models");
+  await win.getByRole("button", { name: "Quote in draft" }).first().click();
+  assert.match(await win.getByLabel("Message", {exact:true}).inputValue(), /Which models/);
   assert.equal(roomCalls[1].body.agent_id, "second");
   await desktop.evaluate((_, id) => {
     globalThis.removedChat = id;

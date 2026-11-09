@@ -88,7 +88,11 @@ export async function cloud(
         ? body
         : body === undefined
           ? undefined
-          : JSON.stringify(body),
+          : JSON.stringify(
+              (path === "research_run" || path === "room_run") && body && typeof body === "object"
+                ? { ...body, history_recall: "auto" }
+                : body,
+            ),
     signal: signal
       ? AbortSignal.any([signal, AbortSignal.timeout(60000)])
       : AbortSignal.timeout(60000),
@@ -213,6 +217,8 @@ export function readReceipt(raw: any): Estimate | undefined {
     compacted_tokens: raw.compacted_tokens_est,
     saved_tokens: raw.saved_tokens_est,
     savings_percent: raw.savings_percent_est,
+    ...(raw.detail?.synced === true ? { historyRecall: "sync" as const } :
+      raw.detail?.fetched === true ? { historyRecall: "fetch" as const } : {}),
   };
   if (isReceipt(receipt)) return receipt as Estimate;
 }

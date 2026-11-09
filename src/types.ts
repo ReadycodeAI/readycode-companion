@@ -27,6 +27,7 @@ export type Receipt = {
   receipt_hash: string;
 };
 export type Estimate = Receipt & {
+  historyRecall?: "fetch" | "sync";
   id: string;
   estimate: true;
   compacted: boolean;

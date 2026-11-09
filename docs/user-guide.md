@@ -31,3 +31,6 @@ In desktop version 1.0.1, a document turn lists the filenames and cited location
 Official signed Windows releases check for updates automatically. You can also check in **Settings**. Finish your current turn, then choose **Restart to update**. The unsigned test installer uses manual updates. Pairing may be required again if a device is revoked or its profile changes.
 
 ReadyCode account access is currently free and may carry a fee in the future. Provider charges and free-tier limits apply separately. Your paired account is required to send chats.
+### Looking up an older decision
+
+Single-agent chat and Ask the room request automatic lookup from ReadyCode Cloud. A reply confirms retrieval only when its cloud receipt reports it. Older servers may ignore the request. **Find an earlier message** searches your own messages already loaded in this chat; **Quote in draft** copies the entire selected message so you can review it before sending. It does not search other rooms or send anything by itself.

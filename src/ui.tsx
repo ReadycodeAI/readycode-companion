@@ -143,6 +143,22 @@ function RemoveChatDialog({
     </dialog>
   );
 }
+function RoomQuote({turns, onQuote}: {turns: Turn[]; onQuote: (text: string) => void}) {
+  const [query, setQuery] = useState("");
+  const needle = query.trim().toLowerCase();
+  const hits = needle ? turns.filter(t => !t.sourceRole && t.prompt.toLowerCase().includes(needle)).slice(-8).reverse() : [];
+  return <details>
+    <summary>Find an earlier message</summary>
+    <label>Search your messages loaded in this chat
+      <input value={query} onChange={e => setQuery(e.target.value)} />
+    </label>
+    {needle && !hits.length && <p>No matching message in the loaded history.</p>}
+    {hits.map(t => <p key={t.id}>
+      {t.prompt.slice(0, 180)}{t.prompt.length > 180 ? "…" : ""}{" "}
+      <button type="button" onClick={() => onQuote(t.prompt)}>Quote in draft</button>
+    </p>)}
+  </details>;
+}
 function Ticket({ r }: { r: Receipt }) {
   const [expanded, setExpanded] = useState(false);
   return (
@@ -302,6 +318,11 @@ function Messages({
                 }
               /></>
             )}
+            {r.researchId && <p className="hint">{r.receipt?.historyRecall === "sync"
+              ? "ReadyCode consulted minified room history."
+              : r.receipt?.historyRecall === "fetch"
+                ? "ReadyCode retrieved earlier messages from this room."
+                : "Earlier-message lookup not confirmed by ReadyCode."}</p>}
             {r.usage && (
               <details>
                 <summary>Provider-reported usage</summary>
@@ -1379,6 +1400,8 @@ function App() {
                       </>
                     )}
                   </div>
+                  {agentMode && chat && <RoomQuote key={chat.id} turns={chat.turns} onQuote={text =>
+                    setDraft(current => [current, "Earlier user message (quoted): " + JSON.stringify(text)].filter(Boolean).join("\n\n"))}/>}
                   {agentMode && (
                     <p className="hint">
                       {!s.paired
