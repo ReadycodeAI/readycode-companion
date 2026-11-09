@@ -589,6 +589,7 @@ try {
   await desktop.evaluate(() => {
     globalThis.catalog = [];
   });
+  if (await win.locator(".agent-options:not([open])").count()) await win.getByText("Agent settings", {exact:true}).click();
   await win.getByRole("button", { name: "Refresh agents" }).click();
   await win.getByText(/No ReadyCode agents are available/).waitFor();
   await desktop.evaluate(() => {
@@ -602,6 +603,7 @@ try {
       },
     ];
   });
+  if (await win.locator(".agent-options:not([open])").count()) await win.getByText("Agent settings", {exact:true}).click();
   await win.getByRole("button", { name: "Refresh agents" }).click();
   await win.getByLabel("Cloud agent").selectOption("news");
   await desktop.evaluate(() => {
@@ -749,6 +751,7 @@ try {
       return Response.json(globalThis.round);
     };
   });
+  if (await win.locator(".agent-options:not([open])").count()) await win.getByText("Agent settings", {exact:true}).click();
   await win.getByRole("button", { name: "Refresh agents" }).click();
   await win.getByLabel("Ask the room").check();
   await win.getByRole("button", { name: "Send to 1 agent" }).waitFor();

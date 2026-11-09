@@ -150,6 +150,7 @@ export type ReaderRequest = {
 };
 export interface Bridge {
   ideSetup:()=>Promise<{script:string;descriptor:string}>;
+  shareIDERoom:(id:string)=>Promise<void>;
   registerCodex:()=>Promise<void>;
   registerCursor:()=>Promise<void>;
   detectHosts:()=>Promise<Record<string,boolean>>;

@@ -3,7 +3,7 @@
   "productName": "ReadyCode Companion",
   "description": "ReadyCode desktop chat companion",
   "author": "ReadyCode",
-  "version": "1.0.5",
+  "version": "1.0.6",
   "license": "MIT",
   "private": true,
   "type": "module",

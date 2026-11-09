@@ -2,7 +2,7 @@
 
 ReadyCode Companion is a free, MIT-licensed desktop AI companion and multi-agent harness powered by ReadyCode Cloud.
 
-**Windows x64 preview:** The unsigned 1.0.5 installer is available for testing. Read the release notes for the SHA-256 checksum and Windows installation steps. Install the current preview manually over 1.0.2 and earlier. From 1.0.3, the Windows preview checks GitHub on launch and every four hours, downloads newer releases, and offers Restart to update. [Download the Windows preview](https://github.com/ReadycodeAI/readycode-companion/releases/tag/preview-windows-1.0.5)
+**Windows x64 preview:** The unsigned 1.0.6 installer is available for testing. Read the release notes for the SHA-256 checksum and Windows installation steps. Install the current preview manually over 1.0.2 and earlier. From 1.0.3, the Windows preview checks GitHub on launch and every four hours, downloads newer releases, and offers Restart to update. [Download the Windows preview](https://github.com/ReadycodeAI/readycode-companion/releases/tag/preview-windows-1.0.6)
 
 The 1.0.2 preview includes Coding goals and setup instructions for Codex, Cursor and local model hosts. [Connect a local lead or IDE](docs/coding-goals.md).
 

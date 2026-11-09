@@ -36,8 +36,8 @@ async function launch() {
       const fixtures = {
         status: { ok: true },
         pair: { device_token: "rcd_fixture" },
-        chats: { chats: [] },
-        messages: { messages: [], runs: [] },
+        chats: { chats: [{chat_id:"room-chat",room_id:"shared-room",title:"Shared discussion"}] },
+        messages: { messages: [{id:"m1",role:"user",label:"You",content:"Room handoff fixture"}], runs: [] },
         research_agents: {
           agents: globalThis.catalog.map((id) => ({
             id,
@@ -82,11 +82,13 @@ try {
   await app.evaluate(() => {
     globalThis.catalog = ["first"];
   });
+  if (await page.locator(".agent-options:not([open])").count()) await page.getByText("Agent settings", {exact:true}).click();
   await page.getByRole("button", { name: "Refresh agents" }).click();
   await selected(page, "first");
   await app.evaluate(() => {
     globalThis.catalog.push("second");
   });
+  if (await page.locator(".agent-options:not([open])").count()) await page.getByText("Agent settings", {exact:true}).click();
   await page.getByRole("button", { name: "Refresh agents" }).click();
   await selected(page, "second");
   await page.getByRole("checkbox", { name: "Coding goal" }).check();
@@ -112,10 +114,11 @@ try {
       response: ++globalThis.approvals === 1 ? 1 : 0,
     });
   });
-  await page.getByRole("button", { name: "IDE & MCP setup" }).click();
+  assert.equal(await page.getByRole("checkbox",{name:"Connect to Codex",exact:true}).count(),1);
+  await page.getByText("IDE options",{exact:true}).click();
   await page.getByLabel("IDE setup", { exact: true }).waitFor();
   await page.getByLabel("IDE setup").selectOption("Local model host");
-  await page.getByRole("button", { name: "Connect Local model host" }).click();
+  await page.getByRole("checkbox", { name: "Connect to Local model host" }).check();
   const serverJSON = await page
     .locator("pre")
     .filter({ hasText: '"mcpServers"' })
@@ -149,6 +152,33 @@ try {
         .tools,
     );
     assert.equal((await tool("project", {})).root, null);
+    await page.evaluate(() => window.companion.refresh());
+    const readRoom = room_id => rpc("tools/call",{name:"room_history",arguments:{room_id}});
+    assert.equal((await readRoom("shared-room")).isError,true);
+    await page.getByRole("button",{name:"Shared discussion",exact:true}).click();
+    await page.getByText("IDE options",{exact:true}).click();
+    await page.getByLabel("IDE setup").selectOption("Local model host");
+    await page.getByRole("checkbox",{name:"Connect to Local model host"}).check();
+    await page.getByText("Room prompt copied.",{exact:false}).waitFor();
+    assert.equal((await tool("room_history",{room_id:"shared-room"})).messages[0].content,"Room handoff fixture");
+    assert.equal((await readRoom("another-room")).isError,true);
+    await page.getByText("IDE options",{exact:true}).click();
+    const pane = page.locator(".transcript");
+    await pane.evaluate(el=>{
+      el.firstElementChild.style.minHeight="4000px";
+      el.scrollTop=el.scrollHeight;
+    });
+    await page.waitForTimeout(100);
+    const position=()=>pane.evaluate(el=>[el.scrollTop,document.scrollingElement.scrollTop]);
+    const atBottom=await position();
+    assert.ok(atBottom[0]>1000);
+    await page.evaluate(()=>window.companion.refresh());
+    assert.deepEqual(await position(),atBottom);
+    await pane.evaluate(el=>{el.scrollTop=500;});
+    await page.waitForTimeout(100);
+    await page.evaluate(()=>window.companion.refresh());
+    assert.deepEqual(await position(),[500,atBottom[1]]);
+    await page.getByText("IDE options",{exact:true}).click();
     assert.ok(
       (
         await rpc("tools/call", {

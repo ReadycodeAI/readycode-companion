@@ -385,7 +385,6 @@ class ReplyBoundary extends React.Component<
 }
 function App() {
   const [chatSort, setChatSort] = useState(() => localStorage.getItem("chat-sort") || "latest");
-  const leadPanelRef=useRef<HTMLDetailsElement>(null);
   const [s, setState] = useState<State | null>(null),
     [error, setError] = useState(""),
     [settings, setSettings] = useState(false);
@@ -484,8 +483,7 @@ function App() {
     };
   }, [agentMode, s?.paired, id, settings, catalogVersion]);
   const [light, setLight] = useState(localStorage.getItem("theme") === "light");
-  const bottom = useRef<HTMLDivElement>(null),
-    scroll = useRef<HTMLDivElement>(null),
+  const scroll = useRef<HTMLDivElement>(null),
     pinned = useRef(true);
   async function run(fn: () => Promise<unknown>) {
     setError("");
@@ -520,8 +518,18 @@ function App() {
     localStorage.setItem("secondary", second);
   }, [p, model, second]);
   useEffect(() => {
-    if (pinned.current) bottom.current?.scrollIntoView({ block: "end" });
-  }, [s, id]);
+    const pane = scroll.current;
+    const thread = pane?.firstElementChild;
+    if (!pane || !thread) return;
+    function follow() {
+      if (pane && pinned.current) pane.scrollTop = pane.scrollHeight;
+    }
+    follow();
+    const observer = new ResizeObserver(follow);
+    observer.observe(thread);
+    observer.observe(pane);
+    return () => observer.disconnect();
+  }, [id, s?.paired, settings]);
   const chat = s?.chats.find((c) => c.id === id);
   const room =
     s?.paired && !settings && chat?.roomId && !chat.cloudUnavailable
@@ -755,10 +763,6 @@ function App() {
           {!s.chats.length && <small>Your chats will appear here.</small>}
         </nav>
         <div className="side-foot">
-          {s.paired && <button onClick={()=>{
-            setSettings(false);
-            if(leadPanelRef.current){leadPanelRef.current.open=true;leadPanelRef.current.scrollIntoView({block:"nearest"});leadPanelRef.current.querySelector("select")?.focus();}
-          }}>IDE &amp; MCP setup</button>}
           <button onClick={() => void run(() => api.open("history"))}>
             ↗ &nbsp; Cloud chat room
           </button>
@@ -785,7 +789,6 @@ function App() {
             {light ? "☾" : "☼"}
           </button>
         </header>
-        {s.paired && <LeadPanel panelRef={leadPanelRef}/>}
         {s.updateReady && (
           <div className="row" role="status">
             {s.updateMessage}
@@ -1274,7 +1277,7 @@ function App() {
                       ))}
                     </section>
                   ))}
-                <div ref={bottom} />
+
               </div>
             </div>
             <div className="compose">
@@ -1290,7 +1293,9 @@ function App() {
                 </div>
               ) : (
                 <>
+                  <LeadPanel key={"ide-" + id} room={chat}/>
                   <div className="model-row">
+
                     <label>
                       Provider
                       <select
@@ -1406,30 +1411,30 @@ function App() {
                   {agentMode && chat && <RoomQuote key={chat.id} turns={chat.turns} onQuote={text =>
                     setDraft(current => [current, "Earlier user message (quoted): " + JSON.stringify(text)].filter(Boolean).join("\n\n"))}/>}
                   {agentMode && (
-                    <p className="hint">
+                    <div className="hint">
                       {!s.paired
                         ? "Connect ReadyCode to chat with your cloud agents."
                         : agentError ||
                           (!catalogBusy && !agents.length
                             ? "No ReadyCode agents are available for this account. Check your OpenRouter key in ReadyCode AI setup."
-                            : "Chat through ReadyCode. Your agent can search when the question needs web sources.")}{" "}
+                            : "")}{" "}
                       {s.paired && !catalogBusy && (
                         <>
-                          <button onClick={() => reloadCatalog((n) => n + 1)}>
+                          <details className="agent-options"><summary>Agent settings</summary><button onClick={() => reloadCatalog((n) => n + 1)}>
                             Refresh agents
                           </button>{" "}
                           <button
                             onClick={() => void run(() => api.open("aiSetup"))}
                           >
                             AI setup ↗
-                          </button>
+                          </button></details>
                         </>
                       )}
-                    </p>
+                    </div>
                   )}
                   {agentMode && !roomMode && (
                     <div>
-                      <label><input type="checkbox" checked={coding}
+                      <label className="coding-toggle"><input type="checkbox" checked={coding}
                         onChange={e => setCoding(e.target.checked)} /> Coding goal</label>
                       {coding && <label> Goal <input aria-label="Coding goal description"
                         maxLength={500} value={goalDraft || savedGoal || ""} readOnly={!!savedGoal}

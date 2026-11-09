@@ -428,7 +428,16 @@ function handlers() {
   let checkedAt="";
   bind("ideStatus",()=>closeBridge && token===leadOwner ? checkedAt || "waiting" : "disabled");
   let generation=0;
-  const disconnectBridge=async()=>{generation++;await closeBridge?.();closeBridge=undefined};
+  let sharedRoom: Chat | undefined;
+  const disconnectBridge=async()=>{generation++;sharedRoom=undefined;await closeBridge?.();closeBridge=undefined};
+  bind("shareIDERoom", (id: string) => {
+    const room = chats.find(chat => chat.id === id);
+    if (!token || leadOwner !== token || !closeBridge || !room?.roomId || room.cloudUnavailable)
+      throw Error("Connect your IDE and select a saved ReadyCode room first.");
+    clipboard.writeText("I shared a ReadyCode chat from the Companion desktop app. Use the readycode-companion MCP tool room_history with room_id " + room.roomId +
+      " to read the latest discussion. Tell me which room you reached and summarize the most recent request. If the tool is missing, tell me to keep Companion open, check Connect to Codex or the selected IDE, and start a fresh IDE chat.");
+    sharedRoom = room;
+  });
   bind("detectHosts",detectHosts);
   bind("ideProject",()=>project&&token===leadOwner?project.root+" · "+project.base.slice(0,8):"");
   const bridgePaths=()=>({script:app.isPackaged?join(process.resourcesPath,"ide-mcp.cjs"):join(app.getAppPath(),"scripts","ide-mcp.cjs"),
@@ -448,6 +457,13 @@ function handlers() {
       if(choice.response!==0||account!==token||generation!==session)throw Error("Project was not connected.");
       project=p;candidate=undefined;
       return p.root;
+    }, async (id) => {
+      const room = sharedRoom;
+      if (!room || id !== room.roomId || !chats.includes(room)) throw Error("This room is not shared with the IDE.");
+      const data = await (await cloud("messages", account, {chat_id:room.id})).json();
+      if (sharedRoom !== room || !chats.includes(room) || !Array.isArray(data.messages)) throw Error("Room is unavailable.");
+      return {room_id:id,title:room.title,messages:data.messages.slice(-20).map((m: {role:string;label:string;content:string}) =>
+        ({role:m.role,label:m.label,content:m.content}))};
     });
     return {script,descriptor};
   });
@@ -455,7 +471,8 @@ function handlers() {
     if(!closeBridge||!token||leadOwner!==token)throw Error("Enable the project connection first.");
     const {script,descriptor}=bridgePaths();
     const run=promisify(execFile);
-    await run("node",["--version"],{cwd:tmpdir(),windowsHide:true,timeout:10000});
+    const nodeVersion = await run("node",["--version"],{cwd:tmpdir(),windowsHide:true,timeout:10000}).catch(() => { throw Error("Install Node.js 22 or newer, restart Companion, then tick Connect to Codex again."); });
+    if (!(Number.parseInt(nodeVersion.stdout.trim().replace(/^v/, ""), 10) >= 22)) throw Error("Update Node.js to version 22 or newer, restart Companion, then tick Connect to Codex again.");
     const cli=await codexPath();
     if(!cli)throw Error("Install the Codex CLI, then retry.");
     await run(cli,["mcp","add","readycode-companion","--","node",script,descriptor],{cwd:tmpdir(),windowsHide:true,timeout:20000});

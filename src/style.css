@@ -81,9 +81,11 @@ textarea:focus {
 .shell {
   display: grid;
   grid-template-columns: 224px minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
   height: 100vh;
 }
 .shell > aside {
+  min-height: 0;
   display: flex;
   flex-direction: column;
   background: var(--rail);
@@ -632,3 +634,15 @@ dd {
   flex-basis: 100%;
   margin: 0;
 }
+
+.ide-connect-row, .coding-toggle { display: flex; align-items: center; gap: .6rem; }
+.ide-connect-row select, .coding-toggle input { width: auto; }
+.lead-setup small { display: inline-block; margin: .25rem .5rem; color: var(--muted); }
+.agent-options summary { cursor: pointer; }
+
+.ide-inline {display:flex; align-items:center; gap:.65rem; flex-wrap:wrap; margin-bottom:.4rem;}
+.ide-toggle {display:inline-flex; align-items:center; gap:.4rem;}
+.ide-toggle input {width:auto; margin:0;}
+.ide-options {margin-left:auto;}
+.ide-options[open] {flex-basis:100%;}
+.ide-inline summary {cursor:pointer;}

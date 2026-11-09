@@ -21,6 +21,7 @@ export async function openBridge(
   owner: () => string,
   onProjectRead: () => void = () => {},
   approveWorkspace?: (path: string) => Promise<string>,
+  readRoom?: (id: string) => Promise<unknown>,
 ) {
   const account = owner(),
     key = randomBytes(32).toString("hex");
@@ -81,6 +82,13 @@ export async function openBridge(
       const { name, arguments: a = {} } = JSON.parse(
         Buffer.concat(chunks).toString("utf8"),
       );
+      if (name === "room_history") {
+        if (!readRoom) throw Error("Share the room from Companion first.");
+        const history = await readRoom(a.room_id);
+        if (closed || owner() !== account) throw Error("IDE connection expired.");
+        reply(200, history);
+        return;
+      }
       if (name === "project") {
         onProjectRead();
         if (!root) {

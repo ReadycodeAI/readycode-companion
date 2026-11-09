@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from "react";
 const api = window.companion;
 export function LeadPanel({
-  panelRef,
+  room,
 }: {
-  panelRef: React.Ref<HTMLDetailsElement>;
+  room?: import("./types").Chat;
 }) {
   const [project, setProject] = useState(""),
     [goal, setGoal] = useState(""),
@@ -22,7 +22,7 @@ export function LeadPanel({
       .then((found) => {
         if (live) {
           setHosts(found);
-          setClient(Object.keys(found).find((k) => found[k]) ?? "Codex");
+
         }
       })
       .catch(() => {});
@@ -32,6 +32,7 @@ export function LeadPanel({
   }, []);
   useEffect(() => api.leadProgress(setStatus), []);
   const [connected, setConnected] = useState(false);
+  const [shared, setShared] = useState<string>();
   const [registered, setRegistered] = useState(false);
   useEffect(() => {
     if (!ide) return;
@@ -51,6 +52,7 @@ export function LeadPanel({
     void poll();
     return () => { live = false; clearTimeout(timer); };
   }, [ide]);
+  useEffect(() => () => { void api.disconnectIDE().catch(() => {}); }, []);
   async function act(fn: () => Promise<void>) {
     setBusy(true);
     setStatus("");
@@ -62,18 +64,55 @@ export function LeadPanel({
       setBusy(false);
     }
   }
+  const active = registered && shared === room?.id;
+  const [pendingToggle, setPendingToggle] = useState<boolean>();
+  async function toggle(enable: boolean) {
+    if (!enable) {
+      await api.disconnectIDE();
+      setIDE(undefined);
+      setRegistered(false);
+      setConnected(false);
+      setShared(undefined);
+      setStatus("Disconnected.");
+      return;
+    }
+    try {
+      if (!registered || !ide) {
+        setIDE(await api.ideSetup());
+        if (client === "Codex") await api.registerCodex();
+        if (client === "Cursor") await api.registerCursor();
+      }
+      if (room?.roomId && !room.cloudUnavailable) {
+        await api.shareIDERoom(room.id);
+        setStatus("Room prompt copied. Keep Companion open and paste into a new " + client + " chat.");
+      } else {
+        setStatus("IDE access enabled. Open a saved chat to share its discussion.");
+      }
+      setRegistered(true);
+      setShared(room?.id);
+    } catch (error) {
+      await api.disconnectIDE();
+      setRegistered(false);
+      setIDE(undefined);
+      throw error;
+    }
+  }
   return (
-    <details className="lead-setup" ref={panelRef}>
-      <summary>Coding goals · Connect your local lead</summary>
-      <p>
-        Connect your IDE first. When it shares its open Git project, Companion
-        shows the path for you to confirm.
-      </p>
-      <label>
-        IDE or model host{" "}
+    <section className="ide-inline">
+      <label className="ide-toggle">
+        <input type="checkbox" checked={pendingToggle ?? active} disabled={busy}
+          onChange={event => {
+            const enabled = event.target.checked;
+            setPendingToggle(enabled);
+            void act(() => toggle(enabled)).finally(() => setPendingToggle(undefined));
+          }}/>
+        Connect to {client}
+      </label>
+      <span role="status">{pendingToggle === true ? "Connecting…" : pendingToggle === false ? "Disconnecting…" : status}</span>
+      <details className="ide-options"><summary>IDE options</summary><label>Host
         <select
           aria-label="IDE setup"
-          disabled={busy || !!ide} value={client}
+          disabled={busy || registered} value={client}
           onChange={(e) => setClient(e.target.value)}
         >
           {["Codex", "Cursor", "Local model host"].map((c) => (
@@ -84,49 +123,13 @@ export function LeadPanel({
           ))}
         </select>
       </label>
-      <button
-        disabled={busy}
-        onClick={() =>
-          act(async () => {
-            setRegistered(false); setConnected(false); if (!ide) setIDE(await api.ideSetup());
-            if (client === "Codex") {
-              await api.registerCodex();
-              setStatus("Registered. Start a new Codex chat in your project.");
-            } else if (client === "Cursor") {
-              await api.registerCursor();
-              setStatus("Confirm installation in Cursor.");
-            } else setStatus("Add the server below in your local model host.");
-            setRegistered(true);
-          })
-        }
-        hidden={!!ide && registered}
-      >
-        {busy ? "Connecting…" : "Connect " + client}
-      </button>
-      <details><summary>Choose a project manually</summary><button
-        disabled={busy}
-        onClick={() =>
-          act(async () => {
-            const p = await api.connectProject();
-            if (p) {
-              setProject(p);
-              setIDE(undefined);
-              setResult(undefined);
-            }
-          })
-        }
-      >
-        Choose project manually
-      </button></details>
       {(project || ide) && (
         <>
           {ide && (
             <div>
-              <p role="status">{connected ? "Connected to " + project :
-                client === "Cursor" ? "Confirm the install in Cursor, then open a chat in your project." :
-                client === "Codex" ? "After registration, open a new Codex chat in your project." :
-                "Add the server below to your local model host."}</p>
-              {!connected && <p>Send this in your IDE, then confirm the folder in Companion:<br/>
+              <details open={client === "Local model host" || undefined}><summary>Connection settings</summary>
+              {connected && <p>Connected to {project}</p>}
+              {!connected && <p>For local coding, send this in your IDE and confirm the folder:<br/>
                 <code>Use the readycode-companion project tool to connect this workspace.</code></p>}
               <details open={client === "Local model host" || undefined}><summary>Manual setup</summary>
                 <p>Install Node.js 22 or newer. {client === "Codex" ? "Run this command, then open a new chat." : "Add this server in your host’s MCP settings."}</p>
@@ -134,19 +137,10 @@ export function LeadPanel({
                   `codex mcp add readycode-companion -- node "${ide.script}" "${ide.descriptor}"` :
                   JSON.stringify({mcpServers:{"readycode-companion":{command:"node",args:[ide.script,ide.descriptor]}}},null,2)}</pre>
               </details>
-              <button
-                onClick={() =>
-                  act(async () => {
-                    await api.disconnectIDE();
-                    setIDE(undefined);
-                  })
-                }
-              >
-                Disconnect IDE access
-              </button>
+              </details>
             </div>
           )}
-          {project && <>          <p>{project}</p>
+          {project && <details><summary>Run a coding goal</summary><p>{project}</p>
           <label>
             Goal{" "}
             <input
@@ -156,7 +150,7 @@ export function LeadPanel({
               onChange={(e) => setGoal(e.target.value)}
             />
           </label>
-</>}
+
           <button
             disabled={busy || !project || !goal.trim()}
             onClick={() =>
@@ -180,9 +174,26 @@ export function LeadPanel({
               <option value="two">Require two specialists</option>
             </select>
           </label>
+          </details>}
         </>
       )}
-      <p role="status">{status}</p>
+
+      <details><summary>Local project</summary><button
+        disabled={busy}
+        onClick={() =>
+          act(async () => {
+            const p = await api.connectProject();
+            if (p) {
+              setProject(p);
+              setIDE(undefined);
+              setResult(undefined);
+            }
+          })
+        }
+      >
+        Choose project manually
+      </button></details>
+
       {result && (
         <>
           <p>{result.branch}</p>
@@ -214,5 +225,6 @@ export function LeadPanel({
         </>
       )}
     </details>
+    </section>
   );
 }
