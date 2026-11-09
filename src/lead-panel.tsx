@@ -31,6 +31,26 @@ export function LeadPanel({
     };
   }, []);
   useEffect(() => api.leadProgress(setStatus), []);
+  const [connected, setConnected] = useState(false);
+  const [registered, setRegistered] = useState(false);
+  useEffect(() => {
+    if (!ide) return;
+    let live = true;
+    let timer: ReturnType<typeof setTimeout>;
+    async function poll() {
+      try {
+        const state = await api.ideStatus();
+        const folder = await api.ideProject();
+        if (!live) return;
+        setProject(folder);
+        setConnected(!!folder && state !== "waiting" && state !== "disabled");
+        if (state === "disabled") { setIDE(undefined); return; }
+      } catch { /* Retry while setup is open. */ }
+      if (live) timer = setTimeout(poll, 1500);
+    }
+    void poll();
+    return () => { live = false; clearTimeout(timer); };
+  }, [ide]);
   async function act(fn: () => Promise<void>) {
     setBusy(true);
     setStatus("");
@@ -53,7 +73,7 @@ export function LeadPanel({
         IDE or model host{" "}
         <select
           aria-label="IDE setup"
-          value={client}
+          disabled={busy || !!ide} value={client}
           onChange={(e) => setClient(e.target.value)}
         >
           {["Codex", "Cursor", "Local model host"].map((c) => (
@@ -68,7 +88,7 @@ export function LeadPanel({
         disabled={busy}
         onClick={() =>
           act(async () => {
-            setIDE(await api.ideSetup());
+            setRegistered(false); setConnected(false); if (!ide) setIDE(await api.ideSetup());
             if (client === "Codex") {
               await api.registerCodex();
               setStatus("Registered. Start a new Codex chat in your project.");
@@ -76,12 +96,14 @@ export function LeadPanel({
               await api.registerCursor();
               setStatus("Confirm installation in Cursor.");
             } else setStatus("Add the server below in your local model host.");
+            setRegistered(true);
           })
         }
+        hidden={!!ide && registered}
       >
-        Connect {client}
+        {busy ? "Connecting…" : "Connect " + client}
       </button>
-      <button
+      <details><summary>Choose a project manually</summary><button
         disabled={busy}
         onClick={() =>
           act(async () => {
@@ -95,119 +117,23 @@ export function LeadPanel({
         }
       >
         Choose project manually
-      </button>
+      </button></details>
       {(project || ide) && (
         <>
-          <p>{project}</p>
-          <label>
-            Goal{" "}
-            <input
-              value={goal}
-              maxLength={4000}
-              disabled={busy}
-              onChange={(e) => setGoal(e.target.value)}
-            />
-          </label>
-          <p>
-            Run the signed-in Codex CLI as lead, or enable IDE access and give
-            the goal to your open Codex or Cursor session. Cloud assignments and
-            replies are saved in ReadyCode. The IDE uses its own account for its
-            other calls.
-          </p>
           {ide && (
             <div>
-              <p>
-                1. Install Node.js 22 or newer on this computer and open the
-                selected folder in {client}.
-              </p>
-              {client === "Codex" ? (
-                <>
-                  <p>
-                    If automatic registration failed, sign in to the Codex CLI
-                    and retry using the button. You can also run the command
-                    below yourself.
-                  </p>
-                  <button
-                    disabled={busy}
-                    onClick={() =>
-                      act(async () => {
-                        await api.registerCodex();
-                        setStatus(
-                          "Registered. Start a new Codex session in this project.",
-                        );
-                      })
-                    }
-                  >
-                    Register in Codex
-                  </button>
-                  <pre
-                    style={{ whiteSpace: "pre-wrap" }}
-                  >{`codex mcp add readycode-companion -- node "${ide.script}" "${ide.descriptor}"`}</pre>
-                </>
-              ) : (
-                <>
-                  <p>
-                    {client === "Cursor"
-                      ? "2. Open Cursor Settings → MCP (Tools & MCP in some versions)."
-                      : "2. In your coding host, select a local model that supports tools (for example via Ollama). The host must support MCP stdio and provide local file and test tools."}{" "}
-                    Add a custom stdio server using the command and arguments
-                    below. Merge the entry into your host’s configuration and
-                    enable readycode-companion.
-                  </p>
-                  <pre style={{ whiteSpace: "pre-wrap" }}>
-                    {JSON.stringify(
-                      {
-                        mcpServers: {
-                          "readycode-companion": {
-                            command: "node",
-                            args: [ide.script, ide.descriptor],
-                          },
-                        },
-                      },
-                      null,
-                      2,
-                    )}
-                  </pre>
-                </>
-              )}
-              <p>
-                Start a new {client} chat, send this prompt and confirm the
-                proposed project in Companion.
-              </p>
-              <pre style={{ whiteSpace: "pre-wrap" }}>
-                Call the readycode-companion project tool with workspace set to
-                my current Git checkout. Show recent goals and read the roadmap
-                before starting new work.
-              </pre>
-              <button
-                onClick={() =>
-                  act(async () => {
-                    const state = await api.ideStatus();
-                    setProject(await api.ideProject());
-                    setStatus(
-                      state === "waiting"
-                        ? "Waiting for the IDE to call the project tool. Check the server is enabled, Node is on PATH, and the tool call is approved."
-                        : state === "disabled"
-                          ? "IDE access is disabled."
-                          : "Project tool reached Companion at " +
-                            new Date(state).toLocaleTimeString(),
-                    );
-                  })
-                }
-              >
-                Check IDE connection
-              </button>
-              <p>4. Give your goal to the IDE. For example:</p>
-              <pre style={{ whiteSpace: "pre-wrap" }}>
-                Remember my preferred AI after restarting Companion. Lead this
-                locally. Use readycode-companion to give each cloud specialist a
-                distinct assignment, check their replies, run the restart test
-                and show me the diff before committing.
-              </pre>
-              <p>
-                Keep Companion open. After restarting it, reconnect your host
-                here.
-              </p>
+              <p role="status">{connected ? "Connected to " + project :
+                client === "Cursor" ? "Confirm the install in Cursor, then open a chat in your project." :
+                client === "Codex" ? "After registration, open a new Codex chat in your project." :
+                "Add the server below to your local model host."}</p>
+              {!connected && <p>Send this in your IDE, then confirm the folder in Companion:<br/>
+                <code>Use the readycode-companion project tool to connect this workspace.</code></p>}
+              <details open={client === "Local model host" || undefined}><summary>Manual setup</summary>
+                <p>Install Node.js 22 or newer. {client === "Codex" ? "Run this command, then open a new chat." : "Add this server in your host’s MCP settings."}</p>
+                <pre style={{whiteSpace:"pre-wrap"}}>{client === "Codex" ?
+                  `codex mcp add readycode-companion -- node "${ide.script}" "${ide.descriptor}"` :
+                  JSON.stringify({mcpServers:{"readycode-companion":{command:"node",args:[ide.script,ide.descriptor]}}},null,2)}</pre>
+              </details>
               <button
                 onClick={() =>
                   act(async () => {
@@ -220,6 +146,17 @@ export function LeadPanel({
               </button>
             </div>
           )}
+          {project && <>          <p>{project}</p>
+          <label>
+            Goal{" "}
+            <input
+              value={goal}
+              maxLength={4000}
+              disabled={busy}
+              onChange={(e) => setGoal(e.target.value)}
+            />
+          </label>
+</>}
           <button
             disabled={busy || !project || !goal.trim()}
             onClick={() =>

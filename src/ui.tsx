@@ -384,6 +384,7 @@ class ReplyBoundary extends React.Component<
   }
 }
 function App() {
+  const [chatSort, setChatSort] = useState(() => localStorage.getItem("chat-sort") || "latest");
   const leadPanelRef=useRef<HTMLDetailsElement>(null);
   const [s, setState] = useState<State | null>(null),
     [error, setError] = useState(""),
@@ -727,9 +728,11 @@ function App() {
         >
           ＋ &nbsp; New chat
         </button>
-        <div className="section-label">Conversations</div>
+        <div className="section-label">Conversations {s.paired && <button disabled={working} onClick={() => void run(() => api.refresh())}>Refresh chats</button>}</div>
+        <label>Sort chats <select value={chatSort} onChange={e => {setChatSort(e.target.value); localStorage.setItem("chat-sort", e.target.value);}}><option value="latest">Latest activity</option><option value="title">Title A–Z</option></select></label>
+        {s.historyError && <small role="status">Cloud history could not refresh: {s.historyError}</small>}
         <nav>
-          {s.chats.map((c) => (
+          {s.chats.slice().sort((a,b) => chatSort === "title" ? a.title.localeCompare(b.title) : (b.activityAt ?? 0) - (a.activityAt ?? 0)).map((c) => (
             <div className="chat-nav-row" key={c.id}>
               <button
                 className={id === c.id ? "selected" : ""}

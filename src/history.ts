@@ -34,7 +34,9 @@ export function mergeHistory(
       throw Error("Invalid cloud chat.");
     const chat = local.find((v) => v.id === c.chat_id);
     if (removedIds?.has(c.chat_id)) continue;
+    const at = Date.parse(c.updated_at ?? c.created_at);
     if (chat) {
+      if (Number.isFinite(at)) chat.activityAt = Math.max(at, chat.activityAt ?? 0);
       chat.title = c.title;
       chat.roomId = c.room_id;
     } else
@@ -42,6 +44,7 @@ export function mergeHistory(
         id: c.chat_id,
         title: c.title,
         roomId: c.room_id,
+        activityAt: Number.isFinite(at) ? at : undefined,
         turns: [],
       });
   }

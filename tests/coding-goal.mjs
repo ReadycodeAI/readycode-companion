@@ -116,22 +116,14 @@ try {
   await page.getByLabel("IDE setup", { exact: true }).waitFor();
   await page.getByLabel("IDE setup").selectOption("Local model host");
   await page.getByRole("button", { name: "Connect Local model host" }).click();
-  await page.getByLabel("IDE setup").selectOption("Codex");
-  await page.getByRole("button", { name: "Register in Codex" }).waitFor();
-  await page.getByLabel("IDE setup", { exact: true }).selectOption("Cursor");
-  await page.getByText(/Open Cursor Settings/).waitFor();
-  await page
-    .getByLabel("IDE setup", { exact: true })
-    .selectOption("Local model host");
-  await page.getByText(/local model that supports tools/).waitFor();
   const serverJSON = await page
     .locator("pre")
     .filter({ hasText: '"mcpServers"' })
     .innerText();
   const [script, descriptor] =
     JSON.parse(serverJSON).mcpServers["readycode-companion"].args;
-  await page.getByRole("button", { name: "Check IDE connection" }).click();
-  await page.getByText(/Waiting for the IDE to call/).waitFor();
+
+  await page.getByText(/Use the readycode-companion project tool/).waitFor();
   const cli = spawn(process.execPath, [script, descriptor], {
     stdio: ["pipe", "pipe", "inherit"],
   });
@@ -180,8 +172,8 @@ try {
       ),
       process.cwd().replaceAll("\\", "/"),
     );
-    await page.getByRole("button", { name: "Check IDE connection" }).click();
-    await page.getByText(/Project tool reached Companion/).waitFor();
+
+    await page.getByText(/Connected to /).first().waitFor();
     const { chat_id } = await tool("start_goal", { goal: "Remember default" });
     const route = await tool("dispatch", { chat_id });
     assert.equal(route.route, "lead");

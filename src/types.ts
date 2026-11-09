@@ -99,6 +99,7 @@ export type Turn = {
   replies: Reply[];
 };
 export type Chat = {
+  activityAt?: number;
   id: string;
   title: string;
   turns: Turn[];

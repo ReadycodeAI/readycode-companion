@@ -161,6 +161,8 @@ try {
           : Response.json({ ok: true });
       if (url.endsWith("/chats"))
         return Response.json({ chats: globalThis.cleanupChats ?? [] });
+      if (url.endsWith("/delete_chat") && body.chat_id === "old-cloud")
+        return Response.json({ error: "unknown_chat" }, { status: 404 });
       if (url.endsWith("/delete_chat"))
         return globalThis.allowDelete
           ? Response.json({ ok: true, deleted: true, ...body })
@@ -800,6 +802,7 @@ try {
   await desktop.evaluate(() => {
     globalThis.cleanupChats = [
       { chat_id: "keep-cloud", room_id: "room-1", title: "Keep cloud copy" },
+      { chat_id: "old-cloud", room_id: "old-room", title: "Old cloud chat" },
       {
         chat_id: "delete-cloud",
         room_id: "room-2",
@@ -857,6 +860,13 @@ try {
         c.headers.Authorization === "Bearer rcd_fixture",
     ),
   );
+  const oldChat = win.getByRole("button", { name: "Remove chat: Old cloud chat" });
+  await oldChat.click();
+  await win.getByRole("radio", { name: "Delete here and on ReadyCode" }).check();
+  await win.getByRole("button", { name: "Delete here and on ReadyCode" }).click();
+  await oldChat.waitFor({ state: "detached" });
+  await win.evaluate(() => window.companion.refresh());
+  assert.equal(await oldChat.count(), 0);
   await desktop.evaluate(() => {
     globalThis.revoked = true;
   });

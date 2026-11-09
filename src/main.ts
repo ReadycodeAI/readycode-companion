@@ -323,6 +323,7 @@ async function send(input: Send) {
       status: "waiting",
     })),
   };
+  chat.activityAt = Date.now();
   chat.turns.push(turn);
   active = controller;
   let timer: NodeJS.Timeout | undefined;
@@ -516,23 +517,21 @@ function handlers() {
     deleting.add(id);
     try {
       if (scope === "cloud") {
-        if (!chat.roomId || chat.cloudUnavailable)
+        if (!chat.roomId)
           throw Error("Only a saved ReadyCode chat can be deleted online.");
-        const ack = await (
-          await cloud("delete_chat", owner, {
+        const response = await cloud("delete_chat", owner, {
             chat_id: id,
             room_id: chat.roomId,
-          })
-        ).json();
-        if (
-          ack.ok !== true ||
-          ack.deleted !== true ||
-          ack.chat_id !== id ||
-          ack.room_id !== chat.roomId
-        )
-          throw Error(
-            "ReadyCode did not confirm deletion. The local copy was kept.",
-          );
+          }).catch((error) => {
+            if (error instanceof UnknownCloudChat) return null;
+            throw error;
+          });
+        if (response) {
+          const ack = await response.json();
+          if (ack?.ok !== true || ack.deleted !== true ||
+              ack.chat_id !== id || ack.room_id !== chat.roomId)
+            throw Error("ReadyCode did not confirm deletion. The local copy was kept.");
+        }
       }
       if (owner !== token) throw Error("The connected account changed.");
       const remaining = chats.filter((c) => c.id !== id);
@@ -674,6 +673,7 @@ function handlers() {
         if (!rounds.some((r) => r.requestId === previous.requestId))
           rounds.push(previous);
       }
+      chat.activityAt = Date.now();
       submitting.add(id);
       chat.research = run;
       run.status = "submitting";
